@@ -1,3 +1,6 @@
 [submodule "tilde-backend"]
 	path = tilde-backend
 	url = https://github.com/c3lang/tilde-backend
+[submodule "vxcc"]
+	path = vxcc
+	url = https://github.com/alex-s168/vxcc_v3.git
