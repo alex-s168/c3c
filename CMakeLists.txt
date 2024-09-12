@@ -62,6 +62,7 @@ option(C3_LINK_DYNAMIC "link dynamically with LLVM/LLD libs")
 set(C3_LLVM_VERSION "auto" CACHE STRING "Use LLVM version [default: auto]")
 option(C3_USE_MIMALLOC "Use built-in mimalloc" OFF)
 option(C3_USE_TB "Use TB" OFF)
+option(C3_USE_VXCC "Use VXCC" OFF)
 set(C3_MIMALLOC_TAG "v1.7.3" CACHE STRING "Used version of mimalloc")
 option(C3_WITH_LLVM "Build with LLVM" ON)
 
@@ -90,16 +91,18 @@ if(C3_WITH_LLVM)
 endif()
 
 find_package(Git QUIET)
-if(C3_USE_TB AND GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
-    # Update submodules as needed
-    option(GIT_SUBMODULE "Check submodules during build" ON)
-    if(GIT_SUBMODULE)
-        message(STATUS "Submodule update")
-        execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
-                WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                RESULT_VARIABLE GIT_SUBMOD_RESULT)
-        if(NOT GIT_SUBMOD_RESULT EQUAL "0")
-            message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+if(C3_USE_TB OR C3_USE_VXCC)
+    if(GIT_FOUND AND EXISTS "${CMAKE_SOURCE_DIR}/.git")
+        # Update submodules as needed
+        option(GIT_SUBMODULE "Check submodules during build" ON)
+        if(GIT_SUBMODULE)
+            message(STATUS "Submodule update")
+            execute_process(COMMAND ${GIT_EXECUTABLE} submodule update --init --recursive
+                    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                    RESULT_VARIABLE GIT_SUBMOD_RESULT)
+            if(NOT GIT_SUBMOD_RESULT EQUAL "0")
+                message(FATAL_ERROR "git submodule update --init --recursive failed with ${GIT_SUBMOD_RESULT}, please checkout submodules")
+            endif()
         endif()
     endif()
 endif()
@@ -421,8 +424,22 @@ if (C3_USE_TB)
             "${CMAKE_SOURCE_DIR}/tilde-backend/include/")
 
 else()
-
     target_compile_definitions(c3c PUBLIC TB_AVAILABLE=0)
+endif()
+
+if (C3_USE_VXCC)
+
+    target_sources(c3c PRIVATE 
+                   src/compiler/vxcc_codegen.c)
+
+    add_custom_target(vxcc ALL vxcc/build.sh build 
+                      BYPRODUCTS vxcc/build/vxcc.a 
+                      WORKING_DIRECTORY vxcc 
+                      SOURCES vxcc)
+
+    target_compile_definitions(c3c PUBLIC, VXCC_AVAILABLE=1)
+    target_link_libraries(c3c vxcc/build/vxcc.a)
+    add_dependencies(c3c vxcc)
 
 endif()
 
