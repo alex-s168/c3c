@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Grab the version
 file(READ "src/version.h" ver)
 if (NOT ${ver} MATCHES "COMPILER_VERSION \"([0-9]+.[0-9]+.[0-9]+)\"")
@@ -437,7 +439,7 @@ if (C3_USE_VXCC)
                       WORKING_DIRECTORY vxcc 
                       SOURCES vxcc)
 
-    target_compile_definitions(c3c PUBLIC, VXCC_AVAILABLE=1)
+    target_compile_definitions(c3c PUBLIC VXCC_AVAILABLE=1)
     target_link_libraries(c3c vxcc/build/vxcc.a)
     add_dependencies(c3c vxcc)
 
