@@ -126,6 +126,19 @@ void thread_compile_task_llvm(void *compile_data)
 }
 #endif 
 
+#if VXCC_AVAILABLE
+void thread_compile_task_vxcc(void *compile_data)
+{
+    CompileData *data = compile_data;
+    data->object_name = vxcc_codegen(data->context);
+}
+#else 
+const char *thread_compile_task_vxcc(void *context)
+{
+	error_exit("VXCC backend not available.");
+}
+#endif 
+
 void thread_compile_task_tb(void *compile_data)
 {
 	CompileData *data = compile_data;
@@ -460,17 +473,18 @@ void compiler_compile(void)
 	switch (compiler.build.backend)
 	{
 		case BACKEND_LLVM:
-#if LLVM_AVAILABLE
 			gen_contexts = llvm_gen(modules, module_count);
 			task = &thread_compile_task_llvm;
-#else 
             error_exit("C3C compiled without LLVM!");
-#endif
             break;
 		case BACKEND_TB:
 			gen_contexts = tilde_gen(modules, module_count);
 			task = &thread_compile_task_tb;
 			break;
+        case BACKEND_VXCC:
+            gen_contexts = vxcc_gen(modules, module_count);
+            task = &thread_compile_task_vxcc;
+            break;
 		default:
 			UNREACHABLE
 	}

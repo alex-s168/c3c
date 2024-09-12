@@ -133,7 +133,10 @@ static void usage(void)
 	PRINTF("  --optsize=<option>         - Code size optimization: none, small, tiny.");
 	PRINTF("  --single-module=<yes|no>   - Compile all modules together, enables more inlining.");
 	PRINTF("  --show-backtrace=<yes|no>  - Show detailed backtrace on segfaults.");
-	PRINTF("");
+#if VXCC_AVAILABLE
+    PRINTF("  --experimental-vxcc        - Use the VXCC backend for compilation (probably does not work for you).");
+#endif
+    PRINTF("");
 	PRINTF("  -g                         - Emit debug info.");
 	PRINTF("  -g0                        - Emit no debug info.");
 	PRINTF("");
@@ -485,20 +488,15 @@ static void print_version(void)
 	PRINTF("Installed directory:       %s", find_executable_path());
 	PRINTF("Git Hash:                  %s", GIT_HASH);
 
-#if LLVM_AVAILABLE && TB_AVAILABLE
-    PRINTF("Backends:                  LLVM; TB");
-#elif LLVM_AVAILABLE
-    PRINTF("Backends:                  LLVM");
-#elif TB_AVAILABLE
-    PRINTF("Backends:                  TB");
-#else 
-
-    PRINTF("No backends available");
-#endif
-
+    PRINTF("Available compilation backends:");
 #if LLVM_AVAILABLE
-	PRINTF("LLVM version:              %s", llvm_version);
-	PRINTF("LLVM default target:       %s", llvm_target);
+    PRINTF("  - LLVM version %s ; default target: %s", llvm_version, llvm_target);
+#endif 
+#if TB_AVAILABLE
+    PRINTF("  - Tilde Backend");
+#endif 
+#if VXCC_AVAILABLE
+    PRINTF("  - VXCC");
 #endif 
 }
 
@@ -737,6 +735,13 @@ static void parse_option(BuildOptions *options)
 			}
 			break;
 		case '-':
+#if VXCC_AVAILABLE
+            if (match_longopt("experimental-vxcc"))
+            {
+                options->backend = BACKEND_VXCC;
+                return;
+            }
+#endif 
 			if (match_longopt("max-mem"))
 			{
 				if (at_end() || next_is_opt()) error_exit("error: --max-mem needs a valid integer.");
