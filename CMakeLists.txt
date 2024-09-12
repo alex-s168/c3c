@@ -434,13 +434,13 @@ if (C3_USE_VXCC)
     target_sources(c3c PRIVATE 
                    src/compiler/vxcc_codegen.c)
 
-    add_custom_target(vxcc ALL vxcc/build.sh build 
+    add_custom_target(vxcc ALL bash build.sh
                       BYPRODUCTS vxcc/build/vxcc.a 
-                      WORKING_DIRECTORY vxcc 
+                      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/vxcc" 
                       SOURCES vxcc)
 
     target_compile_definitions(c3c PUBLIC VXCC_AVAILABLE=1)
-    target_link_libraries(c3c vxcc/build/vxcc.a)
+    target_link_libraries(c3c vxcc/build/lib.a vxcc/build/x86.a)
     add_dependencies(c3c vxcc)
 
 endif()

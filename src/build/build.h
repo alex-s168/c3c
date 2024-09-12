@@ -18,7 +18,8 @@
 typedef enum
 {
 	BACKEND_LLVM = 1,
-	BACKEND_TB = 2
+	BACKEND_TB = 2,
+    BACKEND_VXCC = 3,
 } CompilerBackend;
 
 typedef enum
@@ -578,7 +579,7 @@ typedef struct
 	bool lex_only;
 	bool parse_only;
 	bool check_only;
-	bool emit_llvm;
+	bool emit_llvm; // TODO: rename to emit_ir
 	bool emit_asm;
 	bool emit_object_files;
 	bool benchmarking;

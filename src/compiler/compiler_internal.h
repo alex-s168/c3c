@@ -2112,8 +2112,10 @@ CastKind cast_to_bool_kind(Type *type);
 
 const char *llvm_codegen(void *context);
 const char *tilde_codegen(void *context);
+const char *vxcc_codegen(void *context);
 void **llvm_gen(Module** modules, unsigned module_count);
 void **tilde_gen(Module** modules, unsigned module_count);
+void **vxcc_gen(Module** modules, unsigned module_count);
 
 void header_gen(Module **modules, unsigned module_count);
 const char *build_base_name(void);
