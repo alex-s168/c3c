@@ -96,9 +96,16 @@ vx_IrType* vxcc_type(Type* type)
             break;
         }
 
-        // ptr 
-	    case TYPE_FUNC_PTR:
-        case TYPE_POINTER:
+        case TYPE_POINTER: {
+            res->kind = VX_IR_TYPE_KIND_BASE;
+            res->base.pad = 0;
+            res->base.size = compiler.platform.width_pointer / 8;
+            res->base.align = compiler.platform.align_pointer.align;
+            res->base.sizeless = false;
+            res->base.isfloat = false;
+            break;
+        }
+
         // uint 
         case TYPE_U8:
         case TYPE_U16:
@@ -133,10 +140,16 @@ vx_IrType* vxcc_type(Type* type)
             break;
         }
 
+        case TYPE_TYPEDEF: {
+            return vxcc_type(type->canonical);
+        }
+
         default: {
-            error_exit("VXCC currently doesn't support %s type", type->name);
+            error_exit("VXCC currently doesn't support %s type (typekind%i)", type->name, type->type_kind);
         }
     }
+
+    printf("type %s has size of %zu\n", type->name, vx_IrType_size(res));
 
     return res;
 }
