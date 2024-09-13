@@ -8,6 +8,8 @@
 
 static vx_IrType* vxcc_type(Type* type)
 {
+    assert(type != NULL);
+
     if (type->backend_type) return type->backend_type;
 
     vx_IrType* res = fastalloc(sizeof(vx_IrType));
@@ -128,7 +130,6 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
     FOREACH(Decl *, param, fn->signature.params)
     {
         VxccVarDecl* vxcc = param->var.optional_ref;
-
         vx_IrBlock_add_in(block, vxcc->vxVar, vxcc_type(param->type));
     }
 
