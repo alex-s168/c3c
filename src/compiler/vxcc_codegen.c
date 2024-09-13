@@ -94,7 +94,9 @@ static void vxcc_emit_function_decl(Decl* method)
 
 static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
 {
+    assert(decl != NULL);
     FuncDecl* fn = &decl->func_decl;
+    assert(fn != NULL);
 
     vx_IrBlock* block = fastalloc(sizeof(vx_IrBlock));
     vx_IrBlock_init(block, NULL, NULL); // root block 
@@ -266,10 +268,8 @@ void **vxcc_gen(Module** modules, unsigned module_count)
     vxcc_set_opt_flags();
 
 	if (!module_count) return NULL;
-    if (compiler.build.single_module == SINGLE_MODULE_ON)
+    if (compiler.build.emit_object_files)
 	{
-		Module* module = modules[0];
-
         if (compiler.build.benchmarking)
 		{
             error_exit("vxcc backend currly does not support benchmarks");
@@ -281,12 +281,16 @@ void **vxcc_gen(Module** modules, unsigned module_count)
 
         vx_CU** cus = NULL;
 
-        FOREACH(CompilationUnit *, unit, module->units)
+        for (size_t m = 0; m < module_count; m ++)
         {
-            vx_CU* cu = fastalloc(sizeof(vx_CU));
-            memset(cu, 0, sizeof(vx_CU));
-            vec_add(cus, cu);
-            vxcc_gen_cu(module, unit, cu);
+            Module* module = modules[m];
+            FOREACH(CompilationUnit *, unit, module->units)
+            {
+                vx_CU* cu = fastalloc(sizeof(vx_CU));
+                memset(cu, 0, sizeof(vx_CU));
+                vec_add(cus, cu);
+                vxcc_gen_cu(module, unit, cu);
+            }
         }
 
         // TODO 
@@ -318,7 +322,9 @@ const char *vxcc_codegen(void *context)
 	vx_CU* cu = context;
     vxcc_set_target(&cu->target);
 
-    FILE* optionalOptimizedSsaIr = NULL;
+    printf("CU with %zu blocks\n", cu->blocks_len);
+
+    FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = NULL;
     FILE* optionalAsm = NULL;
     vx_BinFormat optionalBinFormat = 0; FILE* optionalBinOut = NULL;
