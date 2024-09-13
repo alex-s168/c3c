@@ -182,6 +182,8 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
 
     // no need for implicit return because we are already at tail and the return var is initialized with undefined
 
+    vx_CIrBlock_fix(block);
+
     return block;
 }
 
@@ -330,7 +332,15 @@ const char *vxcc_codegen(void *context)
 
     const char * tempFilePath = ".test_out"; // TODO 
 
-    if (compiler.build.emit_object_files)
+    if (compiler.build.emit_asm)
+	{
+        optionalAsm = fopen(tempFilePath, "w");
+	}
+    else if (compiler.build.emit_llvm)
+    {
+        optionalOptimizedLlIr = fopen(tempFilePath, "w");
+    }
+    else if (compiler.build.emit_object_files)
 	{
         switch (compiler.platform.object_format)
         {
@@ -352,14 +362,6 @@ const char *vxcc_codegen(void *context)
 
         optionalBinOut = fopen(tempFilePath, "w");
 	}
-    else if (compiler.build.emit_asm)
-	{
-        optionalAsm = fopen(tempFilePath, "w");
-	}
-    else if (compiler.build.emit_llvm)
-    {
-        optionalOptimizedLlIr = fopen(tempFilePath, "w");
-    }
 
     int res = vx_CU_compile(cu,
                 optionalOptimizedSsaIr,
