@@ -1,6 +1,7 @@
 #include "compiler_internal.h"
 #include "../../vxcc/ir/ir.h"
 #include "../../vxcc/ir/opt.h"
+#include "../../vxcc/ir/cir.h"
 
 // if the function returns a value (not void), the variable that contains the return type is always 0
 // variables are enumerated trough the whole CU and can be any id except 0 
