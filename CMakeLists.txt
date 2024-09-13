@@ -437,12 +437,12 @@ if (C3_USE_VXCC)
                    src/compiler/vxcc_codegen_expr.c)
 
     add_custom_target(vxcc ALL bash build.sh build
-                      BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a" "${PROJECT_SOURCE_DIR}/vxcc/build/x86.a"
+                      BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a"
                       WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/vxcc" 
                       SOURCES vxcc)
 
     target_compile_definitions(c3c PUBLIC VXCC_AVAILABLE=1)
-    target_link_libraries(c3c "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a" "${PROJECT_SOURCE_DIR}/vxcc/build/x86.a")
+    target_link_libraries(c3c "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a")
     add_dependencies(c3c vxcc)
 
 endif()
@@ -460,9 +460,11 @@ if(C3_WITH_LLVM)
 
 else() 
 
-    target_link_libraries(c3c ${llvm_libs} miniz ${lld_libs})
+    target_link_libraries(c3c miniz)
 
 endif()
+
+target_link_libraries(c3c m)
 
 if(C3_USE_MIMALLOC)
     target_link_libraries(c3c mimalloc-static)
