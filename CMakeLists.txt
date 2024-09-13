@@ -435,7 +435,7 @@ if (C3_USE_VXCC)
                    src/compiler/vxcc_codegen.c)
 
     add_custom_target(vxcc ALL bash build.sh build
-                      BYPRODUCTS vxcc/build/vxcc.a 
+                      BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a" "${PROJECT_SOURCE_DIR}/vxcc/build/x86.a"
                       WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/vxcc" 
                       SOURCES vxcc)
 
