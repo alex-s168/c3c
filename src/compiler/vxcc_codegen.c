@@ -259,35 +259,12 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
 
 static void vxcc_set_opt_flags(void)
 {
-    // TODO: other opt flags  
+    // TODO:opt flags  
 
-    switch (compiler.build.optlevel)
-    {
-        case OPTIMIZATION_NOT_SET:
-            break;
-
-        case OPTIMIZATION_NONE:
-            vx_g_optconfig.if_eval = false;
-            vx_g_optconfig.loop_simplify = false;
-            vx_g_optconfig.consteval_iterations = 0;
-            vx_g_optconfig.max_total_cmov_inline_cost = 0;
-            break;
-
-        case OPTIMIZATION_LESS:
-            vx_g_optconfig.if_eval = true;
-            vx_g_optconfig.loop_simplify = true;
-            vx_g_optconfig.consteval_iterations = 4;
-            vx_g_optconfig.max_total_cmov_inline_cost = 2;
-            break;
-
-        case OPTIMIZATION_AGGRESSIVE:
-        case OPTIMIZATION_MORE:
-            vx_g_optconfig.if_eval = true;
-            vx_g_optconfig.loop_simplify = true;
-            vx_g_optconfig.consteval_iterations = 6;
-            vx_g_optconfig.max_total_cmov_inline_cost = 4;
-            break;
-    }
+    vx_g_optconfig.if_eval = true;
+    vx_g_optconfig.loop_simplify = true;
+    vx_g_optconfig.consteval_iterations = 6;
+    vx_g_optconfig.max_total_cmov_inline_cost = 4;
 }
 
 void **vxcc_gen(Module** modules, unsigned module_count)
