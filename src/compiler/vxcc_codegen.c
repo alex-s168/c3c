@@ -6,7 +6,7 @@
 
 // we use fastalloc during compile module and then fastfreeall when module done
 
-static VxccVarDecl* vxcc_var(Decl* decl)
+VxccVarDecl* vxcc_var(Decl* decl)
 {
     assert(decl->decl_kind == DECL_VAR);
 
@@ -38,7 +38,7 @@ static VxccVarDecl* vxcc_var(Decl* decl)
             VxccVarDecl* vxcc = fastalloc(sizeof(VxccVarDecl));
             memset(vxcc, 0, sizeof(VxccVarDecl));
             vxcc->vxVar = cu->nextVarId ++;
-            decl->var.optional_ref = vxcc;
+            decl->backend_ref = vxcc;
             return vxcc;
         }
 
@@ -57,7 +57,7 @@ static VxccVarDecl* vxcc_var(Decl* decl)
     return NULL;
 }
 
-static vx_IrType* vxcc_type(Type* type)
+vx_IrType* vxcc_type(Type* type)
 {
     assert(type != NULL);
 
@@ -131,22 +131,7 @@ static vx_IrType* vxcc_type(Type* type)
     return res;
 }
 
-static void vxcc_gen_function_decl(Decl* method) 
-{
-    // TODO 
-}
-
-static void vxcc_emit_type_decl(Decl* type_decl)
-{
-    // TODO 
-}
-
-static void vxcc_emit_function_decl(Decl* method) 
-{
-    // TODO 
-}
-
-static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
+static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
 {
     assert(decl != NULL);
     FuncDecl* fn = &decl->func_decl;
@@ -188,11 +173,12 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
         vx_IrBlock_add_in(block, vxcc->vxVar, vxcc_type(ty));
     }
 
-    Ast* body = astptr(fn->body);
+    Ast* body = astptrzero(fn->body);
 
-
-    // TODO: emit body 
-
+    for (; body; body = astptrzero(body->next))
+    {
+        vxcc_emit_stmt(block, cu, body);
+    }
 
     // no need for implicit return because we are already at tail and the return var is initialized with undefined
 
@@ -218,7 +204,7 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
         if (only_used && !decl->is_live) continue;
         if (decl->func_decl.body)
         {
-            vx_IrBlock* block = vxcc_emit_function_body(decl);
+            vx_IrBlock* block = vxcc_emit_function_body(vxcu, decl);
             vx_CU_addIrBlock(vx_cu, block, decl->is_export);
         }
     }
@@ -226,13 +212,13 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
     FOREACH(Decl *, func, cu->lambdas)
     {
         if (only_used && !func->is_live) continue;
-        vx_IrBlock* blk = vxcc_emit_function_body(func);
+        vx_IrBlock* blk = vxcc_emit_function_body(vxcu, func);
         vx_CU_addIrBlock(vx_cu, blk, /*export=*/ false);
     }
 
     if (compiler.build.type != TARGET_TYPE_TEST && compiler.build.type != TARGET_TYPE_BENCHMARK && cu->main_function && cu->main_function->is_synthetic)
     {
-        vx_IrBlock* blk = vxcc_emit_function_body(cu->main_function);
+        vx_IrBlock* blk = vxcc_emit_function_body(vxcu, cu->main_function);
         vx_CU_addIrBlock(vx_cu, blk, /*export=*/ true);
     }
 
@@ -240,7 +226,7 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
     {
         if (only_used && !decl->is_live) continue;
         if (!decl->func_decl.body) continue;
-        vx_IrBlock* block = vxcc_emit_function_body(decl);
+        vx_IrBlock* block = vxcc_emit_function_body(vxcu, decl);
         vx_CU_addIrBlock(vx_cu, block, decl->is_export);
     }
 }
