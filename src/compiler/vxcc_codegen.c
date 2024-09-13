@@ -6,6 +6,57 @@
 
 // we use fastalloc during compile module and then fastfreeall when module done
 
+static VxccVarDecl* vxcc_var(Decl* decl)
+{
+    assert(decl->decl_kind == DECL_VAR);
+
+    if (decl->backend_ref)
+    {
+        return decl->backend_ref;
+    }
+
+    VxccCU* cu = decl->unit->vxcc;
+
+    switch (decl->var.kind)
+    {
+        case VARDECL_MEMBER:
+        case VARDECL_BITMEMBER:
+        // compile time vars don't need vxcc var 
+        case VARDECL_PARAM_CT:
+        case VARDECL_PARAM_CT_TYPE:
+        case VARDECL_LOCAL_CT:
+        case VARDECL_LOCAL_CT_TYPE:
+        // global constant
+        case VARDECL_CONST:
+        // macro params
+        case VARDECL_PARAM_REF:
+        case VARDECL_PARAM_EXPR:
+            break;
+
+        case VARDECL_LOCAL:
+        case VARDECL_PARAM: {
+            VxccVarDecl* vxcc = fastalloc(sizeof(VxccVarDecl));
+            memset(vxcc, 0, sizeof(VxccVarDecl));
+            vxcc->vxVar = cu->nextVarId ++;
+            decl->var.optional_ref = vxcc;
+            return vxcc;
+        }
+
+        case VARDECL_GLOBAL: {
+            error_exit("globals not yet supported by vxcc backend");
+        }
+
+        case VARDECL_UNWRAPPED:
+        case VARDECL_ERASE:
+        case VARDECL_REWRAPPED: {
+            error_exit("TODO: %s:%d", __FILE__, __LINE__);
+        }
+    }
+
+    assert(false);
+    return NULL;
+}
+
 static vx_IrType* vxcc_type(Type* type)
 {
     assert(type != NULL);
@@ -13,6 +64,7 @@ static vx_IrType* vxcc_type(Type* type)
     if (type->backend_type) return type->backend_type;
 
     vx_IrType* res = fastalloc(sizeof(vx_IrType));
+    assert(res != NULL);
     memset(res, 0, sizeof(*res));
 
     type->backend_type = res;
@@ -101,6 +153,7 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
     assert(fn != NULL);
 
     vx_IrBlock* block = fastalloc(sizeof(vx_IrBlock));
+    assert(block != NULL);
     vx_IrBlock_init(block, NULL, NULL); // root block 
     vx_IrBlock_make_root(block, 0); // zero vars (for now) 
 
@@ -114,7 +167,7 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
     // return value 
     if (retTy)
     {
-        // create op that assigns "uninit" to the return var (which then gets returned eventually)
+        // create op that assigns "uninit" to the return var (which then maybe gets returned eventually)
         vx_IrOp* initOp = vx_IrBlock_add_op_building(block);
         vx_IrVar outVar = vx_IrBlock_new_var(block, initOp);
         assert(outVar == 0);
@@ -126,24 +179,20 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
     }
 
     
+
     // parameters
     FOREACH(Decl *, param, fn->signature.params)
     {
-        VxccVarDecl* vxcc = param->var.optional_ref;
-        vx_IrBlock_add_in(block, vxcc->vxVar, vxcc_type(param->type));
+        VxccVarDecl* vxcc = vxcc_var(param);
+        Type* ty = typeget(param->var.type_info);
+        vx_IrBlock_add_in(block, vxcc->vxVar, vxcc_type(ty));
     }
-
-
-    size_t fnTailLabel = vx_IrBlock_new_label(block, NULL);
 
     Ast* body = astptr(fn->body);
 
 
     // TODO: emit body 
 
-
-    // definition of return label that gets jumped to when returning 
-    vx_IrBlock_append_label_op_predefined(block, fnTailLabel);
 
     // no need for implicit return because we are already at tail and the return var is initialized with undefined
 
@@ -152,50 +201,15 @@ static vx_IrBlock* vxcc_emit_function_body(Decl* decl)
 
 static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
 {
+    VxccCU* vxcu = fastalloc(sizeof(VxccCU));
+    assert(vxcu);
+    memset(vxcu, 0, sizeof(VxccCU));
+
+    vxcu->nextVarId = 1; // see vxcc_codegen_internal.h for why this is 1
+
+    cu->vxcc = vxcu;
+
 	bool only_used = strip_unused();
-
-    vx_IrVar next_cu_var = 1; // not 0 ! (read vxcc_codegen_internal.h for more information)
-    FOREACH(Decl *, var, cu->vars)
-    {
-        if (var && !var->is_live) continue;
-
-        switch (var->var.kind)
-        {
-            case VARDECL_MEMBER:
-            case VARDECL_BITMEMBER:
-            // compile time vars don't need vxcc var 
-            case VARDECL_PARAM_CT:
-            case VARDECL_PARAM_CT_TYPE:
-            case VARDECL_LOCAL_CT:
-            case VARDECL_LOCAL_CT_TYPE:
-            // global constant
-            case VARDECL_CONST:
-            // macro params
-            case VARDECL_PARAM_REF:
-            case VARDECL_PARAM_EXPR:
-                break;
-
-            case VARDECL_LOCAL:
-            case VARDECL_PARAM: {
-                VxccVarDecl* vxcc = fastalloc(sizeof(VxccVarDecl));
-                memset(vxcc, 0, sizeof(VxccVarDecl));
-                vxcc->vxVar = next_cu_var ++;
-                var->var.optional_ref = vxcc;
-
-                break;
-            }
-
-            case VARDECL_GLOBAL: {
-                error_exit("globals not yet supported by vxcc backend");
-            }
-
-            case VARDECL_UNWRAPPED:
-            case VARDECL_ERASE:
-            case VARDECL_REWRAPPED: {
-                error_exit("TODO: %s:%d", __FILE__, __LINE__);
-            }
-        }
-    }
 
     FOREACH(Decl *, decl, cu->functions)
     {
@@ -322,8 +336,6 @@ const char *vxcc_codegen(void *context)
 {
 	vx_CU* cu = context;
     vxcc_set_target(&cu->target);
-
-    printf("CU with %zu blocks\n", cu->blocks_len);
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = NULL;

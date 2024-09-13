@@ -10,3 +10,8 @@
 typedef struct {
     vx_IrVar vxVar;
 } VxccVarDecl;
+
+/** CompilationUnit.vxcc can be casted to a pointer of this */
+typedef struct {
+    vx_IrVar nextVarId;
+} VxccCU;

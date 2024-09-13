@@ -1616,11 +1616,15 @@ struct CompilationUnit_
 	int lambda_count;
 	Decl **local_method_extensions;
 	TypeInfo **check_type_variable_array;
-	struct
-	{
-		void *debug_file;
-		void *debug_compile_unit;
-	} llvm;
+	union
+    {
+        struct
+	    {
+		    void *debug_file;
+	        void *debug_compile_unit;
+	    } llvm;
+        void *vxcc;
+    };
 };
 
 typedef struct ParseContext_
