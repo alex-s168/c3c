@@ -86,6 +86,16 @@ vx_IrType* vxcc_type(Type* type)
             break;
         }
 
+        case TYPE_BOOL: {
+            res->kind = VX_IR_TYPE_KIND_BASE;
+            res->base.pad = 0;
+            res->base.size = 1;
+            res->base.align = 1;
+            res->base.sizeless = false;
+            res->base.isfloat = false;
+            break;
+        }
+
         // ptr 
 	    case TYPE_FUNC_PTR:
         case TYPE_POINTER:
@@ -141,6 +151,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     assert(block != NULL);
     vx_IrBlock_init(block, NULL, NULL); // root block 
     vx_IrBlock_make_root(block, 0); // zero vars (for now) 
+    block->name = decl->name;
 
     
     Type* retTy = typeget(fn->signature.rtype);

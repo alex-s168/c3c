@@ -107,6 +107,9 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             vx_IrOp_init(if_op, VX_IR_OP_IF, dest_block);
 
             vx_IrBlock* vbcond = vx_IrBlock_init_heap(dest_block, if_op);
+            vx_OptIrVar condVar = vxcc_emit_expr(vbcond, cu, cond);
+            assert(condVar.present);
+            vx_IrBlock_add_out(vbcond, condVar.var);
             vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbcond });
 
             vx_IrBlock* vbthen = vx_IrBlock_init_heap(dest_block, if_op);
@@ -116,15 +119,13 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             }
             vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND_THEN, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbthen });
 
-            if (belse != NULL)
+            vx_IrBlock* vbelse = vx_IrBlock_init_heap(dest_block, if_op);
+            // can be empty 
+            for (; belse; belse = astptrzero(belse->next))
             {
-                vx_IrBlock* vbelse = vx_IrBlock_init_heap(dest_block, if_op);
-                for (; belse; belse = astptrzero(belse->next))
-                {
-                    vxcc_emit_stmt(vbelse, cu, belse);
-                }
-                vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND_ELSE, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbelse });
+                vxcc_emit_stmt(vbelse, cu, belse);
             }
+            vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND_ELSE, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbelse });
 
             break;
         }
