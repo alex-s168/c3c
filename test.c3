@@ -1,3 +1,9 @@
-fn int add(int a, int b) @export {
-    return a + b;
+fn int max(int a, int b) @export {
+    int res;
+    if (a > b) {
+        res = a;
+    } else {
+        res = b;
+    }
+    return res;
 }
