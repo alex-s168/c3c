@@ -337,7 +337,7 @@ const char *vxcc_codegen(void *context)
     vxcc_set_target(&cu->target);
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
-    FILE* optionalOptimizedLlIr = NULL;
+    FILE* optionalOptimizedLlIr = stdout;  //       ^^^^
     FILE* optionalAsm = NULL;
     vx_BinFormat optionalBinFormat = 0; FILE* optionalBinOut = NULL;
 
