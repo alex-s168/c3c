@@ -432,7 +432,9 @@ endif()
 if (C3_USE_VXCC)
 
     target_sources(c3c PRIVATE 
-                   src/compiler/vxcc_codegen.c)
+                   src/compiler/vxcc_codegen.c
+                   src/compiler/vxcc_codegen_stmt.c
+                   src/compiler/vxcc_codegen_expr.c)
 
     add_custom_target(vxcc ALL bash build.sh build
                       BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a" "${PROJECT_SOURCE_DIR}/vxcc/build/x86.a"
