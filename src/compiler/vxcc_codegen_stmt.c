@@ -130,7 +130,39 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             break;
         }
 
-        case AST_FOR_STMT:
+        case AST_FOR_STMT: {
+            vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp_init(op, VX_CIR_OP_CFOR, dest_block);
+
+            {
+                vx_IrBlock* blk_init = vx_IrBlock_init_heap(dest_block, op);
+                (void) vxcc_emit_expr(blk_init, cu, exprptr(stmt->for_stmt.init));
+                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_START, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_init });
+            }
+
+            {
+                vx_IrBlock* blk_cond = vx_IrBlock_init_heap(dest_block, op);
+                vx_OptIrVar var = vxcc_emit_expr(blk_cond, cu, exprptr(stmt->for_stmt.cond));
+                assert(var.present);
+                vx_IrBlock_add_out(blk_cond, var.var);
+                vx_IrOp_add_param_s(op, VX_IR_NAME_COND, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_cond });
+            }
+
+            {
+                vx_IrBlock* blk_end = vx_IrBlock_init_heap(dest_block, op);
+                (void) vxcc_emit_expr(blk_end, cu, exprptr(stmt->for_stmt.incr));
+                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_ENDEX, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_end });
+            }
+
+            {
+                vx_IrBlock* blk_do = vx_IrBlock_init_heap(dest_block, op);
+                vxcc_emit_stmt(blk_do, cu, astptr(stmt->for_stmt.body));
+                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_DO, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_do });
+            }
+
+            break;
+        }
+
         case AST_FOREACH_STMT:
         case AST_IF_CATCH_SWITCH_STMT: {
             error_exit("statement currently not supported by VXCC backend in: %s", span_to_string(stmt->span));

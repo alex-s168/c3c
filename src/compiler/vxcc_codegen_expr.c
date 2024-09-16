@@ -96,6 +96,7 @@ static vx_OptIrVar vxcc_emit_constexpr(vx_IrBlock* dest_block, VxccCU* cu, vx_Ir
 
 vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
 {
+    assert(expr);
     vx_IrType* outTy = expr->type ? vxcc_type(expr->type) : NULL;
     switch (expr->expr_kind) 
     {
@@ -117,11 +118,162 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
             break;
         }
 
+        case EXPR_DECL: {
+            assert(expr->decl_expr->decl_kind == DECL_VAR);
+            VarDecl* vd = &expr->decl_expr->var;
+            if (vd->bit_is_expr)
+            {
+                vx_OptIrVar init = vxcc_emit_expr(dest_block, cu, vd->init_expr);
+                assert(init.present);
+
+                vx_IrVar dest = vxcc_var(expr->decl_expr)->vxVar;
+
+                vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
+                vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = init.var });
+                vx_IrOp_add_out(op, dest, vxcc_type(expr->decl_expr->type));
+
+                return init;
+            }
+            else 
+            {
+                assert(false);
+            }
+            break;
+        }
+
+        case EXPR_POST_UNARY: {
+            break; // TODO?
+        }
+
+        case EXPR_CAST: {
+            vx_OptIrVar to_cast = vxcc_emit_expr(dest_block, cu, exprptr(expr->cast_expr.expr));
+            assert(to_cast.present);
+            switch (expr->cast_expr.kind)
+            {
+                // int size casts 
+                case CAST_BOOLBOOL:
+                case CAST_BOOLINT:
+                case CAST_INTINT:
+                case CAST_INTBOOL:
+                case CAST_INTENUM: 
+                case CAST_PTRBOOL:
+                case CAST_PTRINT:
+                case CAST_INTPTR:
+                case CAST_PTRPTR: {
+                    Type* old_ty = exprptr(expr->cast_expr.expr)->type; assert(old_ty);
+                    Type* new_ty = expr->type;
+                    
+                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    
+                    size_t old_si = type_size(old_ty);
+                    size_t new_si = type_size(new_ty);
+                    
+                    vx_IrOpType op_kind;
+                    if (old_si >= new_si)
+                        op_kind = VX_IR_OP_BITCAST;
+                    else if (type_is_signed(new_ty)) 
+                        op_kind = VX_IR_OP_SIGNEXT;
+                    else 
+                        op_kind = VX_IR_OP_ZEROEXT;
+                    
+                    vx_IrOp_init(op, op_kind, dest_block);
+                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrVar out = cu->nextVarId ++;
+                    vx_IrOp_add_out(op, out, vxcc_type(new_ty));
+                    
+                    return VX_IRVAR_OPT_SOME(out);
+                }
+
+                // int -> float casts
+                case CAST_BOOLFP:
+                case CAST_INTFP: {
+                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    vx_IrOp_init(op, VX_IR_OP_TOFLT, dest_block);
+                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrVar out = cu->nextVarId ++;
+                    vx_IrOp_add_out(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
+                    break;
+                }
+
+                // float -> int casts 
+                case CAST_FPBOOL:
+                case CAST_FPINT: {
+                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    vx_IrOp_init(op, VX_IR_OP_FROMFLT, dest_block);
+                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrVar out = cu->nextVarId ++;
+                    vx_IrOp_add_out(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
+                    break;
+                }
+
+                // noop
+                case CAST_VOID: {
+                    break;
+                }
+
+                // float size casts
+                case CAST_FPFP: {
+                    error_exit("floating point size casts are currenlty not supported by VXCC backend");
+                    break;
+                }
+
+                // other weird things
+                case CAST_ANYPTR:
+                case CAST_ANYBOOL:
+                case CAST_APTSA:
+                case CAST_ARRVEC:
+                case CAST_BOOLVECINT:
+                case CAST_BSINTARR:
+                case CAST_INTARRBS:
+                case CAST_EREU:
+                case CAST_ERINT:
+                case CAST_ERPTR:
+                case CAST_ERROR:
+                case CAST_EUBOOL:
+                case CAST_EUER:
+                case CAST_IDPTR:
+                case CAST_IDBOOL:
+                case CAST_IDINT:
+                case CAST_PTRANY:
+                case CAST_SLBOOL:
+                case CAST_SAPTR:
+                case CAST_SLSL:
+                case CAST_SLARR:
+                case CAST_STRPTR:
+                case CAST_STINLINE:
+                case CAST_VECARR:
+                case CAST_INTERR:
+                case CAST_EXPVEC: {
+                    error_exit("cast kind %i currenlty not supported by VXCC backend", expr->cast_expr.kind);
+                    break;
+                }
+            }
+            break;
+        }
+
         case EXPR_COND: {
-            assert(vec_size(expr->cond_expr) == 1);
-            Expr* c0 = expr->cond_expr[0];
-            return vxcc_emit_expr(dest_block, cu, c0);
-            break; 
+            size_t s = vec_size(expr->cond_expr);
+            size_t i = 0;
+            // emit all except last expr and ignore ret val
+            for (; i + 1 < s; i ++)
+            {
+                (void) vxcc_emit_expr(dest_block, cu, expr->cond_expr[i]);
+            }
+
+            return vxcc_emit_expr(dest_block, cu, expr->cond_expr[i]); // last expr 
+        }
+
+        case EXPR_EXPRESSION_LIST: {
+            size_t s = vec_size(expr->expression_list);
+            size_t i = 0;
+            // emit all except last expr and ignore ret val
+            for (; i + 1 < s; i ++)
+            {
+                (void) vxcc_emit_expr(dest_block, cu, expr->expression_list[i]);
+            }
+
+            return vxcc_emit_expr(dest_block, cu, expr->expression_list[i]); // last expr       
         }
 
         case EXPR_CONST: {
