@@ -61,36 +61,36 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
         case BINARYOP_EQ: ty = VX_IR_OP_EQ; break;
 
         case BINARYOP_ASSIGN: { // return (left = right)
-            vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
-            vx_IrOp_add_out(op, left.var, vxcc_type(exprptr(bin->left)->type));
-            vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = right.var });
+            vx_IrOp_addOut(op, left.var, vxcc_type(exprptr(bin->left)->type));
+            vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(right.var));
             return right.var;
         }
     }
 
     bool isAssign = bin->operator >= BINARYOP_ASSIGN; // return (left += right) 
 
-    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
     vx_IrOp_init(op, ty, dest_block);
 
     assert(outTy != NULL);
     vx_IrVar out = isAssign ? left.var : cu->nextVarId ++;
-    vx_IrOp_add_out(op, out, outTy);
+    vx_IrOp_addOut(op, out, outTy);
 
-    vx_IrOp_add_param_s(op, VX_IR_NAME_OPERAND_A, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = right.var });
-    vx_IrOp_add_param_s(op, VX_IR_NAME_OPERAND_B, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = left.var });
+    vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(right.var));
+    vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(left.var));
 
     return out;
 }
 
 static vx_OptIrVar vxcc_emit_constexpr(vx_IrBlock* dest_block, VxccCU* cu, vx_IrType* outTy, vx_IrValue value)
 {
-    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
     vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
     vx_IrVar outVar = cu->nextVarId ++;
-    vx_IrOp_add_out(op, outVar, outTy);
-    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, value);
+    vx_IrOp_addOut(op, outVar, outTy);
+    vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, value);
     return VX_IRVAR_OPT_SOME(outVar);
 }
 
@@ -128,16 +128,16 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
 
                 vx_IrVar dest = vxcc_var(expr->decl_expr)->vxVar;
 
-                vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                 vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
-                vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = init.var });
-                vx_IrOp_add_out(op, dest, vxcc_type(expr->decl_expr->type));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(init.var));
+                vx_IrOp_addOut(op, dest, vxcc_type(expr->decl_expr->type));
 
                 return init;
             }
             else 
             {
-                assert(false);
+                // TODO: wtf
             }
             break;
         }
@@ -156,7 +156,6 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                 case CAST_BOOLINT:
                 case CAST_INTINT:
                 case CAST_INTBOOL:
-                case CAST_INTENUM: 
                 case CAST_PTRBOOL:
                 case CAST_PTRINT:
                 case CAST_INTPTR:
@@ -164,7 +163,7 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                     Type* old_ty = exprptr(expr->cast_expr.expr)->type; assert(old_ty);
                     Type* new_ty = expr->type;
                     
-                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                     
                     size_t old_si = type_size(old_ty);
                     size_t new_si = type_size(new_ty);
@@ -178,9 +177,9 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                         op_kind = VX_IR_OP_ZEROEXT;
                     
                     vx_IrOp_init(op, op_kind, dest_block);
-                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(to_cast.var));
                     vx_IrVar out = cu->nextVarId ++;
-                    vx_IrOp_add_out(op, out, vxcc_type(new_ty));
+                    vx_IrOp_addOut(op, out, vxcc_type(new_ty));
                     
                     return VX_IRVAR_OPT_SOME(out);
                 }
@@ -188,22 +187,22 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                 // int -> float casts
                 case CAST_BOOLFP:
                 case CAST_INTFP: {
-                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                     vx_IrOp_init(op, VX_IR_OP_TOFLT, dest_block);
-                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(to_cast.var));
                     vx_IrVar out = cu->nextVarId ++;
-                    vx_IrOp_add_out(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
+                    vx_IrOp_addOut(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
                     break;
                 }
 
                 // float -> int casts 
                 case CAST_FPBOOL:
                 case CAST_FPINT: {
-                    vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+                    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                     vx_IrOp_init(op, VX_IR_OP_FROMFLT, dest_block);
-                    vx_IrOp_add_param_s(op, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = to_cast.var });
+                    vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(to_cast.var));
                     vx_IrVar out = cu->nextVarId ++;
-                    vx_IrOp_add_out(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
+                    vx_IrOp_addOut(op, out, vxcc_type(typeget(expr->cast_expr.type_info)));
                     break;
                 }
 
@@ -221,6 +220,7 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                 // other weird things
                 case CAST_ANYPTR:
                 case CAST_ANYBOOL:
+                case CAST_INTENUM: 
                 case CAST_APTSA:
                 case CAST_ARRVEC:
                 case CAST_BOOLVECINT:
@@ -332,22 +332,22 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
             vx_IrVar ptr = cu->nextVarId ++;
             vx_IrVar out = cu->nextVarId ++;
 
-            vx_IrOp* mul = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* mul = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(mul, VX_IR_OP_MUL, dest_block);
-            vx_IrOp_add_param_s(mul, VX_IR_NAME_OPERAND_A, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = index.var });
-            vx_IrOp_add_param_s(mul, VX_IR_NAME_OPERAND_B, (vx_IrValue) {.type = VX_IR_VAL_IMM_INT, .imm_int = type_size(expr->type) }); // TODO: verify
-            vx_IrOp_add_out(mul, temp, vxcc_type(arr_expr->type));
+            vx_IrOp_addParam_s(mul, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(index.var));
+            vx_IrOp_addParam_s(mul, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_IMM_INT(type_size(expr->type))); // TODO: verify
+            vx_IrOp_addOut(mul, temp, vxcc_type(arr_expr->type));
 
-            vx_IrOp* add = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* add = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(add, VX_IR_OP_ADD, dest_block);
-            vx_IrOp_add_param_s(add, VX_IR_NAME_OPERAND_A, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = array.var });
-            vx_IrOp_add_param_s(add, VX_IR_NAME_OPERAND_B, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = temp });
-            vx_IrOp_add_out(add, ptr, vxcc_type(arr_expr->type));
+            vx_IrOp_addParam_s(add, VX_IR_NAME_OPERAND_A, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = array.var });
+            vx_IrOp_addParam_s(add, VX_IR_NAME_OPERAND_B, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = temp });
+            vx_IrOp_addOut(add, ptr, vxcc_type(arr_expr->type));
 
-            vx_IrOp* lod = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* lod = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(lod, VX_IR_OP_LOAD, dest_block);
-            vx_IrOp_add_param_s(lod, VX_IR_NAME_ADDR, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = ptr});
-            vx_IrOp_add_out(lod, out, outTy);
+            vx_IrOp_addParam_s(lod, VX_IR_NAME_ADDR, (vx_IrValue) {.type = VX_IR_VAL_VAR, .var = ptr});
+            vx_IrOp_addOut(lod, out, outTy);
 
             return VX_IRVAR_OPT_SOME(out);
         }

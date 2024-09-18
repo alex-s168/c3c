@@ -78,7 +78,6 @@ vx_IrType* vxcc_type(Type* type)
 
         case TYPE_VOID: {
             res->kind = VX_IR_TYPE_KIND_BASE;
-            res->base.pad = 0;
             res->base.size = 0;
             res->base.align = 0;
             res->base.isfloat = false;
@@ -88,7 +87,6 @@ vx_IrType* vxcc_type(Type* type)
 
         case TYPE_BOOL: {
             res->kind = VX_IR_TYPE_KIND_BASE;
-            res->base.pad = 0;
             res->base.size = 1;
             res->base.align = 1;
             res->base.sizeless = false;
@@ -98,7 +96,6 @@ vx_IrType* vxcc_type(Type* type)
 
         case TYPE_POINTER: {
             res->kind = VX_IR_TYPE_KIND_BASE;
-            res->base.pad = 0;
             res->base.size = compiler.platform.width_pointer / 8;
             res->base.align = compiler.platform.align_pointer.align;
             res->base.sizeless = false;
@@ -119,7 +116,6 @@ vx_IrType* vxcc_type(Type* type)
         case TYPE_I64:
         case TYPE_I128: {
             res->kind = VX_IR_TYPE_KIND_BASE;
-            res->base.pad = 0;
             res->base.size = type->builtin.bytesize;
             res->base.align = type->builtin.abi_alignment;
             res->base.sizeless = false;
@@ -132,7 +128,6 @@ vx_IrType* vxcc_type(Type* type)
         case TYPE_F64:
         case TYPE_F128: {
             res->kind = VX_IR_TYPE_KIND_BASE;
-            res->base.pad = 0;
             res->base.size = type->builtin.bytesize;
             res->base.align = type->builtin.abi_alignment;
             res->base.sizeless = false;
@@ -163,7 +158,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     vx_IrBlock* block = fastalloc(sizeof(vx_IrBlock));
     assert(block != NULL);
     vx_IrBlock_init(block, NULL, NULL); // root block 
-    vx_IrBlock_make_root(block, 0); // zero vars (for now) 
+    vx_IrBlock_makeRoot(block, 0); // zero vars (for now) 
     block->name = decl->name;
 
     
@@ -177,24 +172,22 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     if (retTy)
     {
         // create op that assigns "uninit" to the return var (which then maybe gets returned eventually)
-        vx_IrOp* initOp = vx_IrBlock_add_op_building(block);
-        vx_IrVar outVar = vx_IrBlock_new_var(block, initOp);
+        vx_IrOp* initOp = vx_IrBlock_addOpBuilding(block);
+        vx_IrVar outVar = vx_IrBlock_newVar(block, initOp);
         assert(outVar == 0);
         vx_IrOp_init(initOp, VX_IR_OP_IMM, block);
-        vx_IrOp_add_out(initOp, outVar, vxcc_type(retTy));
-        vx_IrOp_add_param_s(initOp, VX_IR_NAME_VALUE, (vx_IrValue) { .type = VX_IR_VAL_UNINIT });
+        vx_IrOp_addOut(initOp, outVar, vxcc_type(retTy));
+        vx_IrOp_addParam_s(initOp, VX_IR_NAME_VALUE, VX_IR_VALUE_UNINIT());
 
-        vx_IrBlock_add_out(block,  outVar);
+        vx_IrBlock_addOut(block,  outVar);
     }
-
-    
 
     // parameters
     FOREACH(Decl *, param, fn->signature.params)
     {
         VxccVarDecl* vxcc = vxcc_var(param);
         Type* ty = typeget(param->var.type_info);
-        vx_IrBlock_add_in(block, vxcc->vxVar, vxcc_type(ty));
+        vx_IrBlock_addIn(block, vxcc->vxVar, vxcc_type(ty));
     }
 
     Ast* body = astptrzero(fn->body);

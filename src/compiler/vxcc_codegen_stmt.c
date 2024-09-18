@@ -26,10 +26,10 @@ static void vxcc_emit_decl_stmt(vx_IrBlock* dest_block, VxccCU* cu, Decl* decl)
                 initVal.type = VX_IR_VAL_UNINIT;
             }
 
-            vx_IrOp* assign = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* assign = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(assign, VX_IR_OP_IMM, dest_block);
-            vx_IrOp_add_param_s(assign, VX_IR_NAME_VALUE, initVal);
-            vx_IrOp_add_out(assign, vxcc->vxVar, vxty);
+            vx_IrOp_addParam_s(assign, VX_IR_NAME_VALUE, initVal);
+            vx_IrOp_addOut(assign, vxcc->vxVar, vxty);
 
             break;
         }
@@ -65,7 +65,7 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
         case AST_CASE_STMT:
         case AST_SWITCH_STMT: 
         case AST_DEFAULT_STMT: {
-            error_exit("switch / case / default currently not supported by VXCC backend");
+            error_exit("switch-statements currently not supported by VXCC backend");
             break;
         }
 
@@ -83,11 +83,11 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
                 var = vxcc_emit_expr(dest_block, cu, expr);
             }
 
-            vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(op, VX_IR_OP_RETURN, dest_block);
             if (var.present)
             {
-                vx_IrOp_add_arg(op, (vx_IrValue) { .type = VX_IR_VAL_VAR, .var = var.var });
+                vx_IrOp_addArg(op, VX_IR_VALUE_VAR(var.var));
             }
 
             break;
@@ -103,61 +103,61 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             Ast* bthen = astptr(stmt->if_stmt.then_body);
             Ast* belse = astptrzero(stmt->if_stmt.else_body);
 
-            vx_IrOp* if_op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* if_op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(if_op, VX_IR_OP_IF, dest_block);
 
-            vx_IrBlock* vbcond = vx_IrBlock_init_heap(dest_block, if_op);
+            vx_IrBlock* vbcond = vx_IrBlock_initHeap(dest_block, if_op);
             vx_OptIrVar condVar = vxcc_emit_expr(vbcond, cu, cond);
             assert(condVar.present);
-            vx_IrBlock_add_out(vbcond, condVar.var);
-            vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbcond });
+            vx_IrBlock_addOut(vbcond, condVar.var);
+            vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND, VX_IR_VALUE_BLK(vbcond));
 
-            vx_IrBlock* vbthen = vx_IrBlock_init_heap(dest_block, if_op);
+            vx_IrBlock* vbthen = vx_IrBlock_initHeap(dest_block, if_op);
             for (; bthen; bthen = astptrzero(bthen->next))
             {
                 vxcc_emit_stmt(vbthen, cu, bthen);
             }
-            vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND_THEN, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbthen });
+            vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND_THEN, VX_IR_VALUE_BLK(vbthen));
 
-            vx_IrBlock* vbelse = vx_IrBlock_init_heap(dest_block, if_op);
+            vx_IrBlock* vbelse = vx_IrBlock_initHeap(dest_block, if_op);
             // can be empty 
             for (; belse; belse = astptrzero(belse->next))
             {
                 vxcc_emit_stmt(vbelse, cu, belse);
             }
-            vx_IrOp_add_param_s(if_op, VX_IR_NAME_COND_ELSE, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = vbelse });
+            vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND_ELSE, VX_IR_VALUE_BLK(vbelse));
 
             break;
         }
 
         case AST_FOR_STMT: {
-            vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(op, VX_CIR_OP_CFOR, dest_block);
 
             {
-                vx_IrBlock* blk_init = vx_IrBlock_init_heap(dest_block, op);
+                vx_IrBlock* blk_init = vx_IrBlock_initHeap(dest_block, op);
                 (void) vxcc_emit_expr(blk_init, cu, exprptr(stmt->for_stmt.init));
-                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_START, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_init });
+                vx_IrOp_addParam_s(op, VX_IR_NAME_LOOP_START, VX_IR_VALUE_BLK(blk_init));
             }
 
             {
-                vx_IrBlock* blk_cond = vx_IrBlock_init_heap(dest_block, op);
+                vx_IrBlock* blk_cond = vx_IrBlock_initHeap(dest_block, op);
                 vx_OptIrVar var = vxcc_emit_expr(blk_cond, cu, exprptr(stmt->for_stmt.cond));
                 assert(var.present);
-                vx_IrBlock_add_out(blk_cond, var.var);
-                vx_IrOp_add_param_s(op, VX_IR_NAME_COND, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_cond });
+                vx_IrBlock_addOut(blk_cond, var.var);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_COND, VX_IR_VALUE_BLK(blk_cond));
             }
 
             {
-                vx_IrBlock* blk_end = vx_IrBlock_init_heap(dest_block, op);
+                vx_IrBlock* blk_end = vx_IrBlock_initHeap(dest_block, op);
                 (void) vxcc_emit_expr(blk_end, cu, exprptr(stmt->for_stmt.incr));
-                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_ENDEX, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_end });
+                vx_IrOp_addParam_s(op, VX_IR_NAME_LOOP_ENDEX, VX_IR_VALUE_BLK(blk_end));
             }
 
             {
-                vx_IrBlock* blk_do = vx_IrBlock_init_heap(dest_block, op);
+                vx_IrBlock* blk_do = vx_IrBlock_initHeap(dest_block, op);
                 vxcc_emit_stmt(blk_do, cu, astptr(stmt->for_stmt.body));
-                vx_IrOp_add_param_s(op, VX_IR_NAME_LOOP_DO, (vx_IrValue) { .type = VX_IR_VAL_BLOCK, .block = blk_do });
+                vx_IrOp_addParam_s(op, VX_IR_NAME_LOOP_DO, VX_IR_VALUE_BLK(blk_do));
             }
 
             break;
@@ -206,7 +206,7 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
                 opTy = VX_IR_OP_CONTINUE;
             }
 
-            vx_IrOp* op = vx_IrBlock_add_op_building(dest_block);
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(op, opTy, dest_block);
 
             break;

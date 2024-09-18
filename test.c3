@@ -37,6 +37,7 @@ fn int addfirst4(int* z) @export
     return z[0] + z[1] + z[2] + z[3];
 }
 
+/*
 fn int sum(int* arr, int len) @export 
 {
     int sum = 0;
@@ -46,3 +47,4 @@ fn int sum(int* arr, int len) @export
     }
     return sum;
 }
+*/
