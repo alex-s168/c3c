@@ -1,3 +1,4 @@
+#include "utils/common.h"
 #include "vxcc_codegen_internal.h"
 
 static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy)
@@ -53,10 +54,102 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
         case BINARYOP_AND: ty = VX_IR_OP_AND; break;
         case BINARYOP_BIT_OR_ASSIGN:
         case BINARYOP_OR: ty = VX_IR_OP_OR; break;
-        case BINARYOP_GT: ty = type_is_signed(expr->type) ? VX_IR_OP_SGT : VX_IR_OP_UGT; break;
-        case BINARYOP_GE: ty = type_is_signed(expr->type) ? VX_IR_OP_SGTE : VX_IR_OP_UGTE; break;
-        case BINARYOP_LT: ty = type_is_signed(expr->type) ? VX_IR_OP_SLT : VX_IR_OP_ULT; break;
-        case BINARYOP_LE: ty = type_is_signed(expr->type) ? VX_IR_OP_SLTE : VX_IR_OP_ULTE; break;
+
+        case BINARYOP_GT:
+        case BINARYOP_GE:
+        case BINARYOP_LT:
+        case BINARYOP_LE: {
+            bool lhs_signed = type_is_signed(exprptr(bin->left)->type);
+            bool rhs_signed = type_is_signed(exprptr(bin->right)->type);
+
+            if (lhs_signed == rhs_signed) {
+                vx_IrOpType ty;
+
+                if (lhs_signed) {
+                    switch (bin->operator)
+                    {
+                        case BINARYOP_GT: ty = VX_IR_OP_SGT; break;
+                        case BINARYOP_GE: ty = VX_IR_OP_SGTE; break;
+                        case BINARYOP_LT: ty = VX_IR_OP_SLT; break;
+                        case BINARYOP_LE: ty = VX_IR_OP_SLTE; break;
+                        default: UNREACHABLE;
+                    }
+                } else {
+                    switch (bin->operator)
+                    {
+                        case BINARYOP_GT: ty = VX_IR_OP_UGT; break;
+                        case BINARYOP_GE: ty = VX_IR_OP_UGTE; break;
+                        case BINARYOP_LT: ty = VX_IR_OP_ULT; break;
+                        case BINARYOP_LE: ty = VX_IR_OP_ULTE; break;
+                        default: UNREACHABLE;
+                    }
+                }
+
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, ty, dest_block);
+                vx_IrVar outVar = cu->nextVarId ++;
+                vx_IrOp_addOut(op, outVar, vxcc_type(expr->type));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(left.var));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(right.var));
+                return outVar;
+            }
+
+            vx_IrOpType ty;
+            if (rhs_signed) { // swap
+                rhs_signed = false; lhs_signed = true;
+                vx_OptIrVar temp = left; left = right; right = temp;
+
+                switch (bin->operator)
+                {
+                    case BINARYOP_GT: ty = VX_IR_OP_ULT; break;
+                    case BINARYOP_GE: ty = VX_IR_OP_ULTE; break;
+                    case BINARYOP_LT: ty = VX_IR_OP_UGT; break;
+                    case BINARYOP_LE: ty = VX_IR_OP_UGTE; break;
+                    default: UNREACHABLE;
+                }
+            } else {
+                switch (bin->operator)
+                {
+                    case BINARYOP_GT: ty = VX_IR_OP_UGT; break;
+                    case BINARYOP_GE: ty = VX_IR_OP_UGTE; break;
+                    case BINARYOP_LT: ty = VX_IR_OP_ULT; break;
+                    case BINARYOP_LE: ty = VX_IR_OP_ULTE; break;
+                    default: UNREACHABLE;
+                }
+            }
+
+            // lhs is signed 
+
+            vx_IrVar lgte0 = cu->nextVarId ++;
+            { // left >= 0
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_SGTE, dest_block);
+                vx_IrOp_addOut(op, lgte0, vxcc_type(expr->type));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(left.var));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_IMM_INT(0));
+            }
+
+            vx_IrVar cmp = cu->nextVarId ++;
+            { // left CMP right
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, ty, dest_block);
+                vx_IrOp_addOut(op, cmp, vxcc_type(expr->type));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(left.var));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(right.var));
+            }
+
+            vx_IrVar out = cu->nextVarId ++;
+            { // lgte0 && cmp
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_AND, dest_block);
+                vx_IrOp_addOut(op, out, vxcc_type(expr->type));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(lgte0));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(cmp));
+            }
+
+            return out;
+        }
+
         case BINARYOP_NE: ty = VX_IR_OP_NEQ; break;
         case BINARYOP_EQ: ty = VX_IR_OP_EQ; break;
 
