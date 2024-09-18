@@ -132,7 +132,7 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
 
         case AST_FOR_STMT: {
             vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
-            vx_IrOp_init(op, VX_CIR_OP_CFOR, dest_block);
+            vx_IrOp_init(op, VX_IR_OP_CFOR, dest_block);
 
             {
                 vx_IrBlock* blk_init = vx_IrBlock_initHeap(dest_block, op);
