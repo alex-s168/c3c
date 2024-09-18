@@ -38,14 +38,7 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
         case BINARYOP_MOD_ASSIGN:
         case BINARYOP_MOD: ty = VX_IR_OP_MOD; break;
         case BINARYOP_SHR_ASSIGN:
-        case BINARYOP_SHR: {
-            if (type_is_signed(expr->type))
-            {
-                error_exit("signed shift right (ASHR) not yet supported by VXCC backend");
-            }
-            ty = VX_IR_OP_SHR;
-            break; 
-        }
+        case BINARYOP_SHR: ty = type_is_signed(expr->type) ? VX_IR_OP_ASHR : VX_IR_OP_SHR; break;
         case BINARYOP_SHL_ASSIGN:
         case BINARYOP_SHL: ty = VX_IR_OP_SHL; break;
         case BINARYOP_BIT_OR: ty = VX_IR_OP_BITIWSE_OR; break;

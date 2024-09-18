@@ -37,6 +37,21 @@ fn int addfirst4(int* z) @export
     return z[0] + z[1] + z[2] + z[3];
 }
 
+fn int assignments(int y) @export 
+{
+    int x = 0;
+    x += y;
+    x -= y;
+    x %= y;
+    x /= y;
+    x *= y;
+    x <<= y;
+    x >>= y;
+    x |= y;
+    x &= y;
+    return (int) x;
+}
+
 /*
 fn int sum(int* arr, int len) @export 
 {
