@@ -52,7 +52,6 @@ fn int assignments(int y) @export
     return (int) x;
 }
 
-/*
 fn int sum(int* arr, int len) @export 
 {
     int sum = 0;
@@ -62,4 +61,3 @@ fn int sum(int* arr, int len) @export
     }
     return sum;
 }
-*/
