@@ -63,6 +63,12 @@ vx_IrType* vxcc_type(Type* type)
 
     if (type->backend_type) return type->backend_type;
 
+    if (type->type_kind == TYPE_TYPEDEF) {
+        vx_IrType* ty = vxcc_type(type->canonical);
+        type->backend_type = ty; 
+        return ty;
+    }
+
     vx_IrType* res = fastalloc(sizeof(vx_IrType));
     assert(res != NULL);
     memset(res, 0, sizeof(*res));
@@ -133,10 +139,6 @@ vx_IrType* vxcc_type(Type* type)
             res->base.sizeless = false;
             res->base.isfloat = true;
             break;
-        }
-
-        case TYPE_TYPEDEF: {
-            return vxcc_type(type->canonical);
         }
 
         default: {
