@@ -87,3 +87,17 @@ fn usz test(int a, int b) @export
 {
     return ((usz) (&a)) + b;
 }
+
+struct Vec2i 
+{
+    int x;
+    int y;
+}
+
+fn int test2() @export 
+{
+    Vec2i vec = Vec2i { .x = 1, .y = 2 };
+    Vec2i copy = vec;
+    int y = vec.y;
+    return y;
+}
