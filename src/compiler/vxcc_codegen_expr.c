@@ -1,7 +1,65 @@
 #include "utils/common.h"
 #include "vxcc_codegen_internal.h"
 
+static vx_IrVar vxcc_emit_unary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy);
+static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy);
+static vx_IrVar vxcc_emit_subscriptExprAddr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr);
+static CastKind cast_invert(CastKind old);
+static void vxcc_emit_cast(vx_IrBlock* dest_block, VxccCU* cu, vx_IrVar dest, Type* destType, vx_IrVar src, Type* srcType, CastKind kind);
+static vx_OptIrVar vxcc_emit_exprAddr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* ptr_type);
 static void vxcc_emit_mutateExpr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrValue newVal, Type* newValType);
+static vx_OptIrVar vxcc_emit_constexpr(vx_IrBlock* dest_block, VxccCU* cu, vx_IrType* outTy, vx_IrValue value);
+
+
+static vx_IrVar vxcc_emit_unary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy)
+{
+    ExprUnary* uni = &expr->unary_expr;
+
+    vx_IrVar inner;
+    vx_IrOpType type;
+    switch (uni->operator)
+    {
+        case UNARYOP_NEG:
+        case UNARYOP_NOT:
+        case UNARYOP_DEREF: {
+            switch (uni->operator) 
+            {
+                case UNARYOP_NEG: type = VX_IR_OP_NEG; break;
+                case UNARYOP_NOT: type = VX_IR_OP_NOT; break;
+                case UNARYOP_DEREF: type = VX_IR_OP_LOAD; break;
+                default: UNREACHABLE;
+            }
+
+            vx_OptIrVar v = vxcc_emit_expr(dest_block, cu, uni->expr);
+            assert(v.present);
+            inner = v.var;
+            break;
+        }
+
+        case UNARYOP_ADDR: {
+            vx_OptIrVar v = vxcc_emit_exprAddr(dest_block, cu, uni->expr, vxcc_type(expr->type));
+            assert(v.present);
+            return v.var;
+        }
+
+        case UNARYOP_INC:
+        case UNARYOP_DEC:
+        case UNARYOP_PLUS:
+        case UNARYOP_BITNEG:
+        case UNARYOP_TADDR:
+        case UNARYOP_ERROR:
+            error_exit("unary op %i not currenlty supported by VXCC backend", uni->operator);
+    }
+
+    vx_IrVar out = cu->nextVarId ++;
+
+    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+    vx_IrOp_init(op, type, dest_block);
+    vx_IrOp_addOut(op, out, vxcc_type(expr->type));
+    vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(inner));
+
+    return out;
+}
 
 static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy)
 {
@@ -9,11 +67,7 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
 
     vx_OptIrVar left = vxcc_emit_expr(dest_block, cu, exprptr(bin->left));
     vx_OptIrVar right = vxcc_emit_expr(dest_block, cu, exprptr(bin->right));
-
-    if (!left.present || !right.present) 
-    {
-        error_exit("codegen error: right / left side of binary expr does not return value?");
-    }
+    assert(left.present && right.present);
 
     vx_IrOpType ty;
     switch (bin->operator)
@@ -332,6 +386,59 @@ static void vxcc_emit_cast(vx_IrBlock* dest_block, VxccCU* cu, vx_IrVar dest, Ty
     }
 }
 
+static vx_OptIrVar vxcc_emit_exprAddr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* ptr_type)
+{
+    switch (expr->expr_kind)
+    {
+        case EXPR_IDENTIFIER: {
+            Decl* ident = expr->identifier_expr.decl;
+            switch (ident->decl_kind) 
+            {
+                case DECL_VAR: {
+                    vx_IrVar var = vxcc_var(ident)->vxVar;
+                    vx_IrVar res = cu->nextVarId ++;
+
+                    vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                    vx_IrOp_init(op, VX_IR_OP_PLACE, dest_block);
+                    vx_IrOp_addOut(op, res, ptr_type);
+                    vx_IrOp_addParam_s(op, VX_IR_NAME_VAR, VX_IR_VALUE_VAR(var));
+
+                    return VX_IRVAR_OPT_SOME(res);
+                }
+
+                default:
+                    error_exit("unsupported (vxcc) expr_decl decl kind");
+            }
+        }
+
+        case EXPR_SUBSCRIPT:
+        case EXPR_SUBSCRIPT_ADDR: { // TODO: wat
+            vx_IrVar ptr = vxcc_emit_subscriptExprAddr(dest_block, cu, expr);
+            return VX_IRVAR_OPT_SOME(ptr);
+        }
+
+        case EXPR_DECL: {
+            assert(expr->decl_expr->decl_kind == DECL_VAR);
+            VarDecl* vd = &expr->decl_expr->var;
+            assert(vd->kind == VARDECL_LOCAL);
+            vx_IrVar var = vxcc_var(expr->decl_expr)->vxVar;
+            vx_IrVar res = cu->nextVarId ++;
+
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+            vx_IrOp_init(op, VX_IR_OP_PLACE, dest_block);
+            vx_IrOp_addOut(op, res, ptr_type);
+            vx_IrOp_addParam_s(op, VX_IR_NAME_VAR, VX_IR_VALUE_VAR(var));
+
+            return VX_IRVAR_OPT_SOME(res);
+        }
+
+        default: {
+            error_exit("getting address of expression kind %i is currenlty not supported by VXCC backend", expr->expr_kind);
+            break;
+        }
+    }
+}
+
 static void vxcc_emit_mutateExpr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrValue newVal, Type* newValType)
 {
     switch (expr->expr_kind)
@@ -428,6 +535,10 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
     {
         case EXPR_BINARY: {
             return VX_IRVAR_OPT_SOME(vxcc_emit_binary(dest_block, cu, expr, outTy));
+        }
+
+        case EXPR_UNARY: {
+            return VX_IRVAR_OPT_SOME(vxcc_emit_unary(dest_block, cu, expr, outTy));
         }
 
         case EXPR_IDENTIFIER: {

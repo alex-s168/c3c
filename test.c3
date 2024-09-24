@@ -82,3 +82,8 @@ fn void colwise_reduce_sum(int* dest, int* a, usz w, usz h) @export
         dest[col] = sum;
     }
 }
+
+fn usz test(int a, int b) @export 
+{
+    return ((usz) (&a)) + b;
+}
