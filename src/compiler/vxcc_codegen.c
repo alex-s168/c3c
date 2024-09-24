@@ -141,6 +141,20 @@ vx_IrType* vxcc_type(Type* type)
             break;
         }
 
+        case TYPE_STRUCT: {
+            StructDecl* decl = &type->decl->strukt;
+
+            res->kind = VX_IR_TYPE_KIND_CIR_STRUCT;
+            res->cir_struct.pack = false;
+            res->cir_struct.align = decl->size;
+            res->cir_struct.members_len = vec_size(decl->members);
+            res->cir_struct.members = calloc(vec_size(decl->members), sizeof(vx_IrType*));
+            for (size_t i = 0; i < vec_size(decl->members); i ++) {
+                res->cir_struct.members[i] = vxcc_type(decl->members[i]->type);
+            }
+            break;
+        }
+
         default: {
             error_exit("VXCC currently doesn't support %s type (typekind%i)", type->name, type->type_kind);
         }

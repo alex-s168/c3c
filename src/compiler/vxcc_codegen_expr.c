@@ -10,6 +10,16 @@ static vx_OptIrVar vxcc_emit_exprAddr(vx_IrBlock* dest_block, VxccCU* cu, Expr* 
 static void vxcc_emit_mutateExpr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrValue newVal, Type* newValType);
 static vx_OptIrVar vxcc_emit_constexpr(vx_IrBlock* dest_block, VxccCU* cu, vx_IrType* outTy, vx_IrValue value);
 
+static size_t vxcc_indexOfMember(Type* strukt, Decl* member)
+{
+    assert(strukt->type_kind == TYPE_STRUCT);
+    Decl** members = strukt->decl->strukt.members;
+    for (size_t i = 0; i < vec_size(members); i ++)
+        if (members[i] == member)
+            return i;
+    assert(false && "indexOfMember: member not found");
+    UNREACHABLE;
+}
 
 static vx_IrVar vxcc_emit_unary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr, vx_IrType* outTy)
 {
@@ -348,7 +358,11 @@ static void vxcc_emit_cast(vx_IrBlock* dest_block, VxccCU* cu, vx_IrVar dest, Ty
 
         // float size casts
         case CAST_FPFP: {
-            error_exit("floating point size casts are currenlty not supported by VXCC backend");
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+            vx_IrOp_init(op, VX_IR_OP_FLTCAST, dest_block);
+            vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(src));
+            vx_IrVar out = cu->nextVarId ++;
+            vx_IrOp_addOut(op, out, vxcc_type(destType));
             break;
         }
 
