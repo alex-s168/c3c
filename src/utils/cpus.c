@@ -14,6 +14,11 @@ int cpus(void)
 {
 	return sysconf(_SC_NPROCESSORS_ONLN);
 }
+#elif defined(__EMSCRIPTEN__)
+int cpus(void)
+{
+	return 1;
+}
 #else
 int cpus(void)
 {

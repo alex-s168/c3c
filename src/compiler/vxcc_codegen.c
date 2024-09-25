@@ -337,41 +337,8 @@ const char *vxcc_codegen(void *context)
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = stdout;  //       ^^^^
-    FILE* optionalAsm = NULL;
+    FILE* optionalAsm = stdout;
     vx_BinFormat optionalBinFormat = 0; FILE* optionalBinOut = NULL;
-
-    const char * tempFilePath = ".test_out"; // TODO 
-
-    if (compiler.build.emit_asm)
-	{
-        optionalAsm = fopen(tempFilePath, "w");
-	}
-    else if (compiler.build.emit_llvm)
-    {
-        optionalOptimizedLlIr = fopen(tempFilePath, "w");
-    }
-    else if (compiler.build.emit_object_files)
-	{
-        switch (compiler.platform.object_format)
-        {
-            case OBJ_FORMAT_COFF:
-                optionalBinFormat = VX_BIN_COFF;
-                break;
-
-            case OBJ_FORMAT_ELF:
-                optionalBinFormat = VX_BIN_ELF;
-                break;
-
-            case OBJ_FORMAT_MACHO:
-                optionalBinFormat = VX_BIN_MACHO;
-                break;
-
-            default:
-                error_exit("vxcc backend currently does not support this object format");
-        }
-
-        optionalBinOut = fopen(tempFilePath, "w");
-	}
 
     int res = vx_CU_compile(cu,
                 optionalOptimizedSsaIr,
@@ -403,5 +370,5 @@ const char *vxcc_codegen(void *context)
     {
         return NULL;
     }
-    return tempFilePath;
+    return "fake";
 }

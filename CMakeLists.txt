@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -390,7 +390,14 @@ target_include_directories(c3c PRIVATE
         "${CMAKE_BINARY_DIR}")
 
 target_include_directories(miniz PUBLIC
-        "${CMAKE_SOURCE_DIR}/dependencies/miniz/")
+	"${CMAKE_SOURCE_DIR}/dependencies/miniz/")
+
+if(EMSCRIPTEN)
+	set(CMAKE_EXECUTABLE_SUFFIX .html)
+
+	set(EMSCRIPTEN_LD_FLAGS "-sSTACK_SIZE=5mb" "-sINITIAL_MEMORY=2gb")
+	target_link_options(c3c PRIVATE ${EMSCRIPTEN_LD_FLAGS})
+endif()
 
 if (C3_USE_TB)
     file(GLOB tilde-sources
@@ -436,15 +443,17 @@ if (C3_USE_VXCC)
                    src/compiler/vxcc_codegen_stmt.c
                    src/compiler/vxcc_codegen_expr.c)
 
-    add_custom_target(vxcc ALL bash build.sh build
-                      BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a"
-                      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/vxcc" 
-                      SOURCES vxcc)
+   add_custom_target(vxcc ALL ${CMAKE_COMMAND} -E env EX_LDFLAGS="${EMSCRIPTEN_LD_FLAGS}" bash build.sh build
+	      BYPRODUCTS "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a"
+	      WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}/vxcc" 
+	      SOURCES vxcc)
 
     target_compile_definitions(c3c PUBLIC VXCC_AVAILABLE=1)
     target_link_libraries(c3c "${PROJECT_SOURCE_DIR}/vxcc/build/lib.a")
     add_dependencies(c3c vxcc)
 
+else()
+    target_compile_definitions(c3c PUBLIC VXCC_AVAILABLE=0)
 endif()
 
 if(C3_WITH_LLVM)
@@ -487,7 +496,6 @@ else()
     target_compile_definitions(c3c PUBLIC CURL_FOUND=0)
 endif()
 
-
 if(MSVC)
     message("Adding MSVC options")
     target_compile_options(c3c PRIVATE /wd4068 /wd4090 /WX /Wv:18)
@@ -527,11 +535,16 @@ if(MSVC)
     endif()
 else()
     message(STATUS "using gcc/clang warning switches")
-    target_link_options(c3c PRIVATE -pthread)
+    if(EMSCRIPTEN)
+    	target_compile_definitions(c3c PUBLIC USE_PTHREAD=0)
+    else()
+	target_link_options(c3c PRIVATE -pthread)
+	target_compile_options(c3c PRIVATE -pthread)
+    endif()
     if (C3_WITH_LLVM AND NOT LLVM_ENABLE_RTTI)
         target_compile_options(c3c_wrappers PRIVATE -fno-rtti)
     endif()
-    target_compile_options(c3c PRIVATE -pthread -Wall -Werror -Wno-unknown-pragmas -Wno-unused-result
+    target_compile_options(c3c PRIVATE -Wall -Werror -Wno-unknown-pragmas -Wno-unused-result
             -Wno-unused-function -Wno-unused-variable -Wno-unused-parameter)
 endif()
 
