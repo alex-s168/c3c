@@ -75,9 +75,22 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
 {
     ExprBinary* bin = &expr->binary_expr;
 
-    vx_OptIrVar left = vxcc_emit_expr(dest_block, cu, exprptr(bin->right)); // swaped bc idk
-    vx_OptIrVar right = vxcc_emit_expr(dest_block, cu, exprptr(bin->left)); // ^
+    vx_OptIrVar left = vxcc_emit_expr(dest_block, cu, exprptr(bin->left));
+    vx_OptIrVar right = vxcc_emit_expr(dest_block, cu, exprptr(bin->right));
     assert(left.present && right.present);
+
+    bool swapped;
+    switch (bin->operator)
+    {
+        case BINARYOP_SUB:
+        case BINARYOP_DIV:
+        case BINARYOP_SHL:
+        case BINARYOP_SHR:
+            swapped = true; // TODO: verify 
+            break;
+
+        default: swapped = false; break;
+    }
 
     vx_IrOpType ty;
     switch (bin->operator)
@@ -227,8 +240,13 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
     vx_IrVar out = cu->nextVarId ++;
     vx_IrOp_addOut(op, out, outTy);
 
-    vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(right.var));
-    vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(left.var));
+    if (swapped) {
+        vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(right.var));
+        vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(left.var));
+    } else {
+        vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_A, VX_IR_VALUE_VAR(right.var));
+        vx_IrOp_addParam_s(op, VX_IR_NAME_OPERAND_B, VX_IR_VALUE_VAR(left.var));
+    }
 
     if (isAssign) {
         vxcc_emit_mutateExpr(dest_block, cu, exprptr(bin->left), VX_IR_VALUE_VAR(out), expr->type);
