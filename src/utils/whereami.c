@@ -205,6 +205,15 @@ static int get_executable_path_raw(char *out, int capacity, int *dirname_length)
 	return length;
 }
 
+#elif defined(__EMSCRIPTEN__)
+
+static int get_executable_path_raw(char *out, int capacity, int *dirname_length)
+{
+	*out = '\0';
+	*dirname_length = 0;
+	return 0;
+}
+
 #elif defined(__APPLE__)
 
 #define _DARWIN_BETTER_REALPATH

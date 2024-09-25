@@ -53,22 +53,22 @@ void compiler_init(BuildOptions *build_options)
 	// Skip library detection.
 	//compiler.lib_dir = find_lib_dir();
 	//DEBUG_LOG("Found std library: %s", compiler.lib_dir);
-	htable_init(&compiler.context.modules, 16 * 1024);
+	htable_init(&compiler.context.modules, 4 * 1024);
 	decltable_init(&compiler.context.symbols, INITIAL_SYMBOL_MAP);
 	decltable_init(&compiler.context.generic_symbols, INITIAL_GENERIC_SYMBOL_MAP);
 
-	htable_init(&compiler.context.features, 1024);
-	htable_init(&compiler.context.compiler_defines, 16 * 1024);
+	htable_init(&compiler.context.features, 512);
+	htable_init(&compiler.context.compiler_defines, 4 * 1024);
 	compiler.context.module_list = NULL;
 	compiler.context.generic_module_list = NULL;
 	compiler.context.method_extensions = NULL;
-	vmem_init(&ast_arena, 512);
+	vmem_init(&ast_arena, 32);
 	ast_calloc();
-	vmem_init(&expr_arena, 512);
+	vmem_init(&expr_arena, 32);
 	expr_calloc();
-	vmem_init(&decl_arena, 256);
+	vmem_init(&decl_arena, 32);
 	decl_calloc();
-	vmem_init(&type_info_arena, 256);
+	vmem_init(&type_info_arena, 32);
 	type_info_calloc();
 	// Create zero index value.
 	if (build_options->std_lib_dir)

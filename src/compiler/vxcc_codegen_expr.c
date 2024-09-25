@@ -75,8 +75,8 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
 {
     ExprBinary* bin = &expr->binary_expr;
 
-    vx_OptIrVar left = vxcc_emit_expr(dest_block, cu, exprptr(bin->left));
-    vx_OptIrVar right = vxcc_emit_expr(dest_block, cu, exprptr(bin->right));
+    vx_OptIrVar left = vxcc_emit_expr(dest_block, cu, exprptr(bin->right)); // swaped bc idk
+    vx_OptIrVar right = vxcc_emit_expr(dest_block, cu, exprptr(bin->left)); // ^
     assert(left.present && right.present);
 
     vx_IrOpType ty;
