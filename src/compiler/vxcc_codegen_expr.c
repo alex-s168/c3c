@@ -385,6 +385,7 @@ static void vxcc_emit_cast(vx_IrBlock* dest_block, VxccCU* cu, vx_IrVar dest, Ty
         }
 
         // other weird things
+        case CAST_BSBOOL:
         case CAST_ANYPTR:
         case CAST_ANYBOOL:
         case CAST_INTENUM: 
@@ -668,6 +669,7 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                                                (vx_IrValue) {.type = VX_IR_VAL_IMM_INT,.imm_int = expr->const_expr.enum_err_val->enum_constant.ordinal});
                 }
 
+                case CONST_REF:
                 case CONST_ERR:
                 case CONST_BYTES:
                 case CONST_STRING:
