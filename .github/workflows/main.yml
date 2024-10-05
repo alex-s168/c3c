@@ -216,7 +216,7 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Release, Debug]
-        llvm_version: [17, 18]
+        llvm_version: [17, 18, 19, 20]
 
     steps:
       - uses: actions/checkout@v4
@@ -324,7 +324,7 @@ jobs:
       - name: Test WASM
         run: |
           cd resources/testfragments
-          ../../build/c3c compile --reloc=none --target wasm32 -g0 --link-libc=no --no-entry -Os wasm4.c3
+          ../../build/c3c compile --target wasm32 -g0 --no-entry -Os wasm4.c3
 
       - name: Install QEMU and Risc-V toolchain
         run: |
@@ -375,7 +375,7 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Release, Debug]
-        llvm_version: [17, 18]
+        llvm_version: [17, 18, 19, 20]
     steps:
       - uses: actions/checkout@v4
       - name: Install common deps
@@ -496,7 +496,7 @@ jobs:
       matrix:
         ubuntu_version: [20.04, 22.04]
         build_type: [Release, Debug]
-        llvm_version: [17, 18]
+        llvm_version: [17, 18, 19, 20]
 
     steps:
       - uses: actions/checkout@v4
@@ -558,7 +558,7 @@ jobs:
       - name: Test WASM
         run: |
           cd resources/testfragments
-          ../../build/c3c compile --reloc=none --target wasm32 -g0 --link-libc=no --no-entry -Os wasm4.c3
+          ../../build/c3c compile --reloc=none --target wasm32 -g0 --no-entry -Os wasm4.c3
 
       - name: Build testproject direct linker
         run: |

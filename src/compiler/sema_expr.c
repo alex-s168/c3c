@@ -182,7 +182,7 @@ static inline bool sema_expr_analyse_type_access(SemaContext *context, Expr *exp
 static inline bool sema_expr_analyse_member_access(SemaContext *context, Expr *expr, Expr *parent, Expr *identifier, bool *missing_ref);
 static inline bool sema_expr_fold_to_member(Expr *expr, Expr *parent, Decl *member);
 static inline bool sema_expr_fold_to_index(Expr *expr, Expr *parent, SubscriptIndex index);
-static inline bool sema_expr_fold_to_range(Expr *expr, Expr *parent, Range range);
+
 static inline void sema_expr_flatten_const_ident(Expr *expr);
 static inline bool sema_analyse_expr_check(SemaContext *context, Expr *expr, CheckType check);
 
@@ -209,6 +209,7 @@ static inline bool sema_constant_fold_ops(Expr *expr)
 		case CONST_MEMBER:
 			return true;
 		case CONST_INITIALIZER:
+		case CONST_SLICE:
 		case CONST_UNTYPED_LIST:
 		case CONST_REF:
 			return false;
@@ -2845,13 +2846,40 @@ static inline bool sema_expr_analyse_subscript(SemaContext *context, Expr *expr,
 	// 3. Check failability due to value.
 	bool optional = IS_OPTIONAL(subscripted);
 
-	Type *underlying_type = type_flatten(subscripted->type);
+	Decl *overload = NULL;
+	Type *index_type = NULL;
+	Expr *current_expr;
+	Type *current_type = subscripted->type->canonical;
+	if (current_type == type_untypedlist)
+	{
+		current_expr = subscripted;
+	}
+	else
+	{
+		current_expr = sema_expr_find_index_type_or_overload_for_subscript(context, subscripted, check, &index_type, &overload);
+		if (!overload && !index_type && is_eval_ref)
+		{
+			// Maybe there is a [] overload?
+			if (sema_expr_find_index_type_or_overload_for_subscript(context, subscripted, check, &index_type, &overload))
+			{
+				if (check_valid) goto VALID_FAIL_POISON;
+				RETURN_SEMA_ERROR(expr, "A function or macro with '@operator(&[])' is not defined for %s, "
+				                        "so you need && to take the address of the temporary.",
+				                  type_quoted_error_string(subscripted->type));
+			}
+		}
+		if (!index_type)
+		{
+			if (check_valid) goto VALID_FAIL_POISON;
+			RETURN_SEMA_ERROR(expr, "Indexing a value of type %s is not possible.", type_quoted_error_string(subscripted->type));
+		}
+		if (!overload) current_type = type_flatten(current_expr->type);
+	}
 
-	Type *current_type = underlying_type;
 	assert(current_type == current_type->canonical);
 	int64_t index_value = -1;
 	bool start_from_end = expr->subscript_expr.index.start_from_end;
-	if (start_from_end && (underlying_type->type_kind == TYPE_POINTER || underlying_type->type_kind == TYPE_FLEXIBLE_ARRAY))
+	if (start_from_end && (current_type->type_kind == TYPE_POINTER || current_type->type_kind == TYPE_FLEXIBLE_ARRAY))
 	{
 		if (check_valid) goto VALID_FAIL_POISON;
 		RETURN_SEMA_ERROR(index, "Indexing from the end is not allowed for pointers "
@@ -2896,8 +2924,9 @@ static inline bool sema_expr_analyse_subscript(SemaContext *context, Expr *expr,
 			                  (long long) size - 1);
 		}
 	}
+
 	// 4. If we are indexing into a complist
-	if (underlying_type == type_untypedlist)
+	if (current_type == type_untypedlist)
 	{
 		if (is_eval_ref)
 		{
@@ -2905,7 +2934,6 @@ static inline bool sema_expr_analyse_subscript(SemaContext *context, Expr *expr,
 			RETURN_SEMA_ERROR(subscripted, "You need to use && to take the address of a temporary.");
 		}
 		// 4a. This may either be an initializer list or a CT value
-		Expr *current_expr = subscripted;
 		while (subscripted->expr_kind == EXPR_CT_IDENT) current_expr = current_expr->ct_ident_expr.decl->var.init_expr;
 
 		// 4b. Now we need to check that we actually have a valid type.
@@ -2920,29 +2948,6 @@ static inline bool sema_expr_analyse_subscript(SemaContext *context, Expr *expr,
 	}
 	if (!sema_cast_rvalue(context, subscripted)) return false;
 
-	Decl *overload = NULL;
-	Type *index_type = NULL;
-	Expr *current_expr = sema_expr_find_index_type_or_overload_for_subscript(context, subscripted, check, &index_type, &overload);
-	if (!index_type)
-	{
-		if (!overload && is_eval_ref)
-		{
-			// Maybe there is a [] overload?
-			if (sema_expr_find_index_type_or_overload_for_subscript(context,
-			                                                        subscripted,
-																	check,
-			                                                        &index_type,
-			                                                        &overload))
-			{
-				if (check_valid) goto VALID_FAIL_POISON;
-				RETURN_SEMA_ERROR(expr, "A function or macro with '@operator(&[])' is not defined for %s, "
-										"so you need && to take the address of the temporary.",
-										type_quoted_error_string(subscripted->type));
-			}
-		}
-		if (check_valid) goto VALID_FAIL_POISON;
-		RETURN_SEMA_ERROR(subscripted, "Cannot index %s.", type_quoted_error_string(subscripted->type));
-	}
 	if (overload)
 	{
 		if (start_from_end)
@@ -3275,6 +3280,62 @@ static inline bool sema_expr_analyse_range(SemaContext *context, Range *range, T
 	}
 }
 
+static inline void sema_slice_initializer(SemaContext *context, Expr *expr, Expr *subscripted, Range *range)
+{
+	ConstInitializer *initializer = subscripted->const_expr.initializer;
+	assert(type_is_arraylike(initializer->type));
+	Type *new_type = type_get_slice(type_get_indexed_type(subscripted->type));
+	// Turn zero length into an untyped list.
+	if (range->len_index == 0)
+	{
+		expr_rewrite_const_empty_slice(expr, new_type);
+		return;
+	}
+	bool is_vec = initializer->type->type_kind == TYPE_VECTOR;
+	Type *inner_type = is_vec
+			? type_get_vector(new_type->array.base, range->len_index)
+			: type_get_array(new_type->array.base, range->len_index);
+	initializer->type = inner_type;
+	switch (initializer->kind)
+	{
+		case CONST_INIT_ZERO:
+			break;
+		case CONST_INIT_ARRAY_FULL:
+			vec_erase_front(initializer->init_array_full, range->start_index);
+			vec_resize(initializer->init_array_full, range->len_index);
+			break;
+		case CONST_INIT_ARRAY:
+		{
+			unsigned elements = vec_size(initializer->init_array.elements);
+			for (unsigned i = 0; i < elements; i++)
+			{
+				ConstInitializer *element = initializer->init_array.elements[i];
+				ArrayIndex index = element->init_array_value.index;
+				if (index < range->start_index || index >= range->start_index + range->len_index)
+				{
+					vec_erase_at(initializer->init_array.elements, i);
+					elements--;
+					i--;
+					continue;
+				}
+			}
+			if (vec_size(initializer->init_array.elements) == 0)
+			{
+				initializer->kind = CONST_INIT_ZERO;
+				break;
+			}
+			break;
+		}
+		case CONST_INIT_STRUCT:
+		case CONST_INIT_UNION:
+		case CONST_INIT_VALUE:
+		case CONST_INIT_ARRAY_VALUE:
+			UNREACHABLE
+	}
+	subscripted->const_expr.const_kind = CONST_SLICE;
+	expr_replace(expr, subscripted);
+	expr->type = new_type;
+}
 
 static inline bool sema_expr_analyse_slice(SemaContext *context, Expr *expr, CheckType check)
 {
@@ -3341,9 +3402,18 @@ static inline bool sema_expr_analyse_slice(SemaContext *context, Expr *expr, Che
 				expr_replace(expr, subscripted);
 				return true;
 			case CONST_INITIALIZER:
+				sema_slice_initializer(context, expr, subscripted, range);
+				return true;
+			case CONST_SLICE:
+				if (!subscripted->const_expr.slice_init)
+				{
+					assert(range->len_index == 0);
+					expr_replace(expr, subscripted);
+					return true;
+				}
+				sema_slice_initializer(context, expr, subscripted, range);
+				return true;
 			case CONST_POINTER:
-				// TODO slice
-				break;
 			case CONST_FLOAT:
 			case CONST_INTEGER:
 			case CONST_BOOL:
@@ -3357,12 +3427,15 @@ static inline bool sema_expr_analyse_slice(SemaContext *context, Expr *expr, Che
 	}
 	Expr *current_expr = subscripted;
 	Type *inner_type = sema_subscript_find_indexable_type_recursively(&type, &current_expr);
-
 	if (type == type_voidptr) inner_type = type_char;
 
 	if (!inner_type || !type_is_valid_for_array(inner_type))
 	{
 		RETURN_SEMA_ERROR(subscripted, "Cannot index %s.", type_quoted_error_string(subscripted->type));
+	}
+	if (current_expr != subscripted)
+	{
+		expr->slice_expr.expr = exprid(current_expr);
 	}
 	// Retain the original type when doing distinct slices.
 	Type *result_type = type_get_slice(inner_type);
@@ -4153,77 +4226,6 @@ static bool sema_expr_rewrite_to_typeid_property(SemaContext *context, Expr *exp
 	return false;
 }
 
-static inline bool sema_expr_fold_to_range(Expr *expr, Expr *parent, Range range)
-{
-	bool is_vector = type_flat_is_vector(parent->type);
-	ConstInitializer *init = parent->const_expr.initializer;
-	ConstInitializer *result;
-	ASSERT_SPAN(expr, !range.start_from_end);
-	ArrayIndex start = range.start_index;
-	ArrayIndex len = range.len_index;
-	assert(len > 0);
-	ArrayIndex end = start + len;
-	Type *indexed = type_get_indexed_type(parent->type);
-	Type *resulting_type = is_vector ? type_get_vector(indexed, len) : type_get_array(indexed, len);
-	switch (init->kind)
-	{
-		case CONST_INIT_ZERO:
-			result = init;
-			break;
-		case CONST_INIT_STRUCT:
-		case CONST_INIT_UNION:
-		case CONST_INIT_VALUE:
-		case CONST_INIT_ARRAY_VALUE:
-			UNREACHABLE
-		case CONST_INIT_ARRAY:
-		{
-			ConstInitializer **new = NULL;
-			FOREACH(ConstInitializer *, e, init->init_array.elements)
-			{
-				ArrayIndex index = e->init_array_value.index;
-				if (index < start || index >= end) continue;
-				vec_add(new, e->init_array_value.element);
-			}
-
-			result = new ? const_init_new_array(resulting_type, new)
-						: const_init_new_zero(resulting_type);
-			break;
-		}
-		case CONST_INIT_ARRAY_FULL:
-		{
-			ConstInitializer **new = NULL;
-			for (ArrayIndex i = start; i < end; i++)
-			{
-				vec_add(new, init->init_array_full[i]);
-			}
-			ASSERT_SPAN(expr, new);
-			result = const_init_new_array_full(resulting_type, new);
-			break;
-		}
-	}
-	result->type = type_flatten(resulting_type);
-	switch (result->kind)
-	{
-		case CONST_INIT_ZERO:
-			expr_rewrite_to_const_zero(expr, resulting_type);
-			break;
-		case CONST_INIT_ARRAY:
-		case CONST_INIT_ARRAY_FULL:
-			expr->expr_kind = EXPR_CONST;
-			expr->const_expr.const_kind = CONST_INITIALIZER;
-			expr->const_expr.initializer = init;
-			expr->type = resulting_type;
-			break;
-		case CONST_INIT_ARRAY_VALUE:
-		case CONST_INIT_STRUCT:
-		case CONST_INIT_UNION:
-		case CONST_INIT_VALUE:
-			UNREACHABLE
-	}
-	return true;
-
-}
-
 static inline bool sema_expr_fold_to_index(Expr *expr, Expr *parent, SubscriptIndex index_expr)
 {
 	ConstInitializer *init = parent->const_expr.initializer;
@@ -4271,8 +4273,7 @@ static inline bool sema_expr_fold_to_index(Expr *expr, Expr *parent, SubscriptIn
 			expr->expr_kind = EXPR_CONST;
 			expr->const_expr.const_kind = CONST_INITIALIZER;
 			expr->const_expr.initializer = result;
-			// TODO fix?
-			expr->type = result->type;
+			expr->type = type_get_indexed_type(parent->type);
 			break;
 		case CONST_INIT_ARRAY_VALUE:
 			UNREACHABLE
@@ -6708,24 +6709,6 @@ static const char *sema_addr_check_may_take(Expr *inner)
 	return "To take the address of a temporary value, use '&&' instead of '&'.";
 }
 
-static bool sema_expr_recursive_const_address(SemaContext *context, Expr *expr)
-{
-	RETRY:
-	switch (expr->expr_kind)
-	{
-		case EXPR_ACCESS:
-			expr = expr->access_expr.parent;
-			goto RETRY;
-		case EXPR_SUBSCRIPT:
-			if (!sema_cast_const(exprptr(expr->subscript_expr.index.expr))) return false;
-			expr = exprptr(expr->subscript_expr.expr);
-			goto RETRY;
-		case EXPR_IDENTIFIER:
-			return decl_is_global(expr->identifier_expr.decl);
-		default:
-			return false;
-	}
-}
 /**
  * Analyse &a
  * @return true if analysis succeeds.
@@ -7601,10 +7584,7 @@ static inline bool sema_expr_analyse_compiler_const(SemaContext *context, Expr *
 		case BUILTIN_DEF_BENCHMARK_NAMES:
 			if (!compiler.build.benchmarking)
 			{
-				expr->const_expr.const_kind = CONST_INITIALIZER;
-				expr->expr_kind = EXPR_CONST;
-				expr->resolve_status = RESOLVE_DONE;
-				expr->const_expr.initializer = const_init_new_zero(expr->type = type_get_slice(type_string));
+				expr_rewrite_const_empty_slice(expr, type_get_slice(type_string));
 				return true;
 			}
 			expr->type = type_get_slice(type_string);
@@ -7614,10 +7594,7 @@ static inline bool sema_expr_analyse_compiler_const(SemaContext *context, Expr *
 		case BUILTIN_DEF_BENCHMARK_FNS:
 			if (!compiler.build.benchmarking)
 			{
-				expr->const_expr.const_kind = CONST_INITIALIZER;
-				expr->expr_kind = EXPR_CONST;
-				expr->resolve_status = RESOLVE_DONE;
-				expr->const_expr.initializer = const_init_new_zero(expr->type = type_get_slice(type_voidptr));
+				expr_rewrite_const_empty_slice(expr, type_get_slice(type_voidptr));
 				return true;
 			}
 			expr->type = type_get_slice(type_voidptr);
@@ -7627,10 +7604,7 @@ static inline bool sema_expr_analyse_compiler_const(SemaContext *context, Expr *
 		case BUILTIN_DEF_TEST_NAMES:
 			if (!compiler.build.testing)
 			{
-				expr->const_expr.const_kind = CONST_INITIALIZER;
-				expr->expr_kind = EXPR_CONST;
-				expr->resolve_status = RESOLVE_DONE;
-				expr->const_expr.initializer = const_init_new_zero(expr->type = type_get_slice(type_string));
+				expr_rewrite_const_empty_slice(expr, type_get_slice(type_string));
 				return true;
 			}
 			expr->type = type_get_slice(type_string);
@@ -7640,10 +7614,7 @@ static inline bool sema_expr_analyse_compiler_const(SemaContext *context, Expr *
 		case BUILTIN_DEF_TEST_FNS:
 			if (!compiler.build.testing)
 			{
-				expr->const_expr.const_kind = CONST_INITIALIZER;
-				expr->expr_kind = EXPR_CONST;
-				expr->resolve_status = RESOLVE_DONE;
-				expr->const_expr.initializer = const_init_new_zero(expr->type = type_get_slice(type_voidptr));
+				expr_rewrite_const_empty_slice(expr, type_get_slice(type_voidptr));
 				return true;
 			}
 			expr->type = type_get_slice(type_voidptr);

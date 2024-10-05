@@ -1134,6 +1134,14 @@ static inline Decl *parse_global_declaration(ParseContext *c)
 		{
 			if (token_is_some_ident(c->tok))
 			{
+				if ((c->tok == TOKEN_TYPE_IDENT || c->tok == TOKEN_CONST_IDENT) &&
+					c->lexer.token_type == TOKEN_LPAREN)
+				{
+					PRINT_ERROR_HERE("This looks like the beginning of a C style function declaration. "
+												 "Unfortunately it seems to be missing the initial 'fn' and "
+												 "the function name does not start with a lower case.");
+					return poisoned_decl;
+				}
 				PRINT_ERROR_HERE("I expected a variable name here, but global variables need to start with lower case.");
 				return poisoned_decl;
 			}
@@ -1158,11 +1166,21 @@ static inline Decl *parse_global_declaration(ParseContext *c)
 		}
 		if (!parse_decl_initializer(c, decl)) return poisoned_decl;
 	}
-	else if (!decl->attributes && tok_is(c, TOKEN_LPAREN) && !threadlocal)
+	else if (!decl->attributes)
 	{
-		// Guess we forgot `fn`? -> improve error reporting.
-		print_error_at(type->span, "This looks like the beginning of a function declaration but it's missing the initial `fn`. Did you forget it?");
-		return poisoned_decl;
+		if (tok_is(c, TOKEN_LPAREN) && !threadlocal)
+		{
+			// Guess we forgot `fn`? -> improve error reporting.
+			print_error_at(type->span, "This looks like the beginning of a function declaration but it's missing the initial `fn`. Did you forget it?");
+			return poisoned_decl;
+		}
+		else if (tok_is(c, TOKEN_LBRACKET))
+		{
+			// Maybe we were doing int foo[4] = ...
+			PRINT_ERROR_HERE("This looks like a declaration of the format 'int foo[4]' "
+							"which is c-style array declaration. In C3, you need to use something like 'int[4] foo' instead.");
+			return poisoned_decl;
+		}
 	}
 	CONSUME_EOS_OR_RET(poisoned_decl);
 	Attr **attributes = decl->attributes;
@@ -1901,8 +1919,28 @@ static inline Decl *parse_def_type(ParseContext *c)
 	}
 
 	// 2. Now parse the type which we know is here.
-	ASSIGN_TYPE_OR_RET(TypeInfo *type_info, parse_type(c), poisoned_decl);
 
+	ASSIGN_EXPR_OR_RET(Expr *expr, parse_expr(c), poisoned_decl);
+	TypeInfo *type_info;
+	switch (expr->expr_kind)
+	{
+		case EXPR_TYPEINFO:
+			type_info = expr->type_expr;
+			break;
+		case EXPR_IDENTIFIER:
+			if (expr->identifier_expr.is_const)
+			{
+				print_error_at(decl->span, "A constant may not have a type name alias, it must have an all caps name.");
+			}
+			else
+			{
+				print_error_at(decl->span, "An identifier may not be aliased with type name, it must start with a lower case letter.");
+			}
+			return poisoned_decl;
+		default:
+			PRINT_ERROR_HERE("Expected a type to alias here.");
+			return poisoned_decl;
+	}
 	assert(!tok_is(c, TOKEN_LGENPAR));
 
 	decl->typedef_decl.type_info = type_info;
@@ -2388,19 +2426,27 @@ static inline bool parse_import(ParseContext *c)
 		is_not_first = true;
 		Path *path = parse_module_path(c);
 		if (!path) return false;
-		bool is_nonrecurse = try_consume(c, TOKEN_BIT_XOR);
 		bool private = false;
+		bool is_norecurse = false;
 		if (tok_is(c, TOKEN_AT_IDENT))
 		{
-			if (symstr(c) != attribute_list[ATTRIBUTE_PUBLIC])
+			const char *name = symstr(c);
+			if (name == attribute_list[ATTRIBUTE_PUBLIC])
 			{
-				PRINT_ERROR_HERE("Only '@public' is a valid attribute here.");
+				private = true;
+			}
+			else if (name == attribute_list[ATTRIBUTE_NORECURSE])
+			{
+				is_norecurse = true;
+			}
+			else
+			{
+				PRINT_ERROR_HERE("Only '@public' and '@norecurse' are valid attributes here.");
 				return false;
 			}
-			private = true;
 			advance_and_verify(c, TOKEN_AT_IDENT);
 		}
-		unit_add_import(c->unit, path, private, is_nonrecurse);
+		unit_add_import(c->unit, path, private, is_norecurse);
 		if (tok_is(c, TOKEN_COLON) && peek(c) == TOKEN_IDENT)
 		{
 			PRINT_ERROR_HERE("'::' was expected here, did you make a mistake?");

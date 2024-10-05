@@ -10,6 +10,20 @@ fn void test_replace()
 	assert(hello.str_view() == "Hello world where are yoooo? Are yoooo here too?");
 }
 
+fn void test_reverse()
+{
+	DString a;
+	a.append("abcd");
+	a.reverse();
+	assert(a.str_view() == "dcba");
+	a.reverse();
+	assert(a.str_view() == "abcd");
+	a.append("e");
+	assert(a.str_view() == "abcde");
+	a.reverse();
+	assert(a.str_view() == "edcba");
+}
+
 fn void test_delete()
 {
 	{
@@ -170,6 +184,23 @@ fn void test_insert_at()
 	str.insert_at(5, " shiny");
 	s = str.str_view();
 	assert(s == "hello shiny world", "got '%s'; want 'hello shiny world'", s);
+
+	str.insert_at(0, '[');
+	s = str.str_view();
+	assert(s == "[hello shiny world", "got '%s'; want '[hello shiny world'", s);
+
+	str.insert_at(18, ']');
+	s = str.str_view();
+	assert(s == "[hello shiny world]", "got '%s'; want 'hello shiny world]'", s);
+
+	str.insert_at(0, 'ꫩ');
+	s = str.str_view();
+	assert(s == "ꫩ[hello shiny world]", "got '%s'; want 'ꫩ[hello shiny world]'", s);
+
+	// ꫩ is 3 bytes long
+	str.insert_utf32_at(4, {'寃', 't', 'e', 'x', 't', '￥'});
+	s = str.str_view();
+	assert(s == "ꫩ[寃text￥hello shiny world]", "got '%s'; want 'ꫩ[寃text￥hello shiny world]'", s);
 }
 
 fn void test_insert_at_overlaps()

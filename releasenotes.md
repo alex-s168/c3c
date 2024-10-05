@@ -1,5 +1,23 @@
 # C3C Release Notes
 
+## 0.6.4 Change list
+
+### Changes / improvements
+- Const vector -> const slice implicit conversion.
+- Slicing arrays, slices and bytes at compile time #1466.
+- Better error for `int a[4] = ...`. #1518
+- Better error for `int Foo(int a)` declarations #1516
+
+### Fixes
+- `Unsupported int[*] $x = { 1, 2, 3, 4 }` #1489.
+- Unexpected compile error using a typed constant with `copysign` #1517
+- Incorrect subscript resolution #1519.
+
+### Stdlib changes
+- Remove unintended print of `char[]` as String
+- Add read/write to stream with big endian ints.
+- Move accidently hidden "wrap_bytes".
+
 ## 0.6.3 Change list
 
 ### Changes / improvements
@@ -25,7 +43,9 @@
 - Allow specifying an import module using `@wasm` #1305.
 - Deprecated inline generic types outside of struct definitions and macros unless marked `@adhoc`.
 - Improved method detection in earlier stages of checking.
-- Allow `^` suffix for non-recursive imports #1480.
+- Allow `@norecurse` attribute for non-recursive imports #1480.
+- wasm32 / wasm64 targets are use-libc=no by default.
+- Add hash/sha256 module 
 
 ### Fixes
 - Issue where a lambda wasn't correctly registered as external. #1408
@@ -60,6 +80,16 @@
 - Fix bug due to enum associated values not being checked for liveness.
 - Regression when compile time accessing a union field not last assigned to.
 - Safer seed of rand() for WASM without libc.
+- Bad error message aliasing an ident with a path. #1481.
+- Error when slicing a struct with an inline array #1488.
+- Improved error messages on `Foo a = foo { 1 };` #1496
+- Bug in json decoder escape handling.
+- Fix bug when reading zip manifest, that would not return a zero terminated string. #1490
+- Fix thread tests.
+- Detect recursion errors on non-recursive mutexes in safe mode.
+- Foreach over distinct pointer failed to be caught as error #1506.
+- Foreach over distinct iterable would ignore operator(len).
+- Compiler crash when compiling c code in a library without --obj-out #1503.
 
 ### Stdlib changes
 - Additional init functions for hashmap.
@@ -68,6 +98,12 @@
 - Add `io::read_new_fully` for reading to the end of a stream.
 - Add `io::wrap_bytes` for reading bytes with `io` functions.
 - Add `rnd` and `rand_in_range` default random functions.
+- Additional timezone related functions for `datetime`.
+- Added MD5 and crypto::safe_compare.
+- Added generic HMAC.
+- Added generic PBKDF2 implementation.
+- DString `reverse`.
+- `DString.insert_at` now has variants for other types.
 
 ## 0.6.2 Change list
 
