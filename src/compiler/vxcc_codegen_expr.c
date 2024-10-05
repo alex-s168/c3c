@@ -570,16 +570,46 @@ vx_IrVar vxcc_emit_constinit(vx_IrBlock* dest_block, VxccCU* cu, ConstInitialize
             return v.var;
         }
 
+        // emits: T var; memset(&var, 0, sizeof(var));
         case CONST_INIT_ZERO: {
+            vx_IrType* ty = vxcc_type(init->type);
+            vx_IrTypeRef ptrTy = vx_ptrType(dest_block);
 
+            vx_IrVar out = cu->nextVarId ++; {
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
+                vx_IrOp_addOut(op, out, ty);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_UNINIT());
+            }
+
+            vx_IrVar ptr = cu->nextVarId ++; {
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_PLACE, dest_block);
+                vx_IrOp_addOut(op, ptr, ptrTy.ptr);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_VAR, VX_IR_VALUE_VAR(out));
+            }
+
+            {
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_MEMSET, dest_block);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_ADDR, VX_IR_VALUE_VAR(ptr));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_SIZE, VX_IR_VALUE_IMM_INT(type_size(init->type)));
+            }
+
+            return out;
         }
 
         case CONST_INIT_ARRAY:
         case CONST_INIT_UNION:
         case CONST_INIT_STRUCT:
         case CONST_INIT_ARRAY_FULL:
-        case CONST_INIT_ARRAY_VALUE:
+        case CONST_INIT_ARRAY_VALUE: {
+            error_exit("const initializer %i currently not supported by VXCC backend", init->kind);
+            UNREACHABLE;
+        }
     }
+
+    UNREACHABLE;
 }
 
 vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
@@ -704,6 +734,7 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                 case CONST_TYPEID:
                 case CONST_UNTYPED_LIST:
                 case CONST_MEMBER:
+                case CONST_SLICE:
                     error_exit("constexpr kind %i currenlty not supported by VXCC backend", expr->const_expr.const_kind);
             }
             break;
