@@ -599,9 +599,36 @@ vx_IrVar vxcc_emit_constinit(vx_IrBlock* dest_block, VxccCU* cu, ConstInitialize
             return out;
         }
 
+        case CONST_INIT_STRUCT: {
+            vx_IrType* ty = vxcc_type(init->type);
+
+            vx_IrVar out = cu->nextVarId ++; {
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_IMM, dest_block);
+                vx_IrOp_addOut(op, out, ty);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_UNINIT());
+            }
+
+            for (size_t i = 0; i < vec_size(init->init_struct); i ++)
+            {
+                vx_IrVar value = vxcc_emit_constinit(dest_block, cu, init->init_struct[i]);
+                vx_IrVar newOut = cu->nextVarId ++;
+
+                vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+                vx_IrOp_init(op, VX_IR_OP_SETELEM, dest_block);
+                vx_IrOp_addOut(op, newOut, ty);
+                vx_IrOp_addParam_s(op, VX_IR_NAME_STRUCT, VX_IR_VALUE_VAR(out));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_IDX, VX_IR_VALUE_IMM_INT(i));
+                vx_IrOp_addParam_s(op, VX_IR_NAME_VALUE, VX_IR_VALUE_VAR(value));
+
+                out = newOut;
+            }
+
+            return out;
+        }
+
         case CONST_INIT_ARRAY:
         case CONST_INIT_UNION:
-        case CONST_INIT_STRUCT:
         case CONST_INIT_ARRAY_FULL:
         case CONST_INIT_ARRAY_VALUE: {
             error_exit("const initializer %i currently not supported by VXCC backend", init->kind);
@@ -772,6 +799,21 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
             vxcc_emit_mutateExpr(dest_block, cu, inner, VX_IR_VALUE_VAR(changed), expr->type);
 
             break;
+        }
+
+        case EXPR_ACCESS: {
+            vx_IrVar out = cu->nextVarId ++;
+            vx_OptIrVar in = vxcc_emit_expr(dest_block, cu, expr->access_expr.parent);
+            assert(in.present);
+            size_t idx = vxcc_indexOfMember(expr->access_expr.parent->type, expr->access_expr.ref);
+
+            vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
+            vx_IrOp_init(op, VX_IR_OP_GETELEM, dest_block);
+            vx_IrOp_addOut(op, out, vxcc_type(expr->type));
+            vx_IrOp_addParam_s(op, VX_IR_NAME_STRUCT, VX_IR_VALUE_VAR(in.var));
+            vx_IrOp_addParam_s(op, VX_IR_NAME_IDX, VX_IR_VALUE_IMM_INT(idx));
+
+            return VX_IRVAR_OPT_SOME(out);
         }
 
         default: {
