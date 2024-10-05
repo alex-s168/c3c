@@ -560,6 +560,28 @@ static vx_OptIrVar vxcc_emit_constexpr(vx_IrBlock* dest_block, VxccCU* cu, vx_Ir
     return VX_IRVAR_OPT_SOME(outVar);
 }
 
+vx_IrVar vxcc_emit_constinit(vx_IrBlock* dest_block, VxccCU* cu, ConstInitializer* init)
+{
+    switch (init->kind)
+    {
+        case CONST_INIT_VALUE: {
+            vx_OptIrVar v = vxcc_emit_expr(dest_block, cu, init->init_value);
+            assert(v.present);
+            return v.var;
+        }
+
+        case CONST_INIT_ZERO: {
+
+        }
+
+        case CONST_INIT_ARRAY:
+        case CONST_INIT_UNION:
+        case CONST_INIT_STRUCT:
+        case CONST_INIT_ARRAY_FULL:
+        case CONST_INIT_ARRAY_VALUE:
+    }
+}
+
 vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
 {
     assert(expr);
@@ -651,22 +673,27 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
             {
                 case CONST_FLOAT: {
                     return vxcc_emit_constexpr(dest_block, cu, outTy,
-                                               (vx_IrValue) {.type = VX_IR_VAL_IMM_FLT,.imm_flt = expr->const_expr.fxx.f});
+                            VX_IR_VALUE_IMM_FLT(expr->const_expr.fxx.f));
                 }
 
                 case CONST_INTEGER: {
                     return vxcc_emit_constexpr(dest_block, cu, outTy,
-                                               (vx_IrValue) {.type = VX_IR_VAL_IMM_INT,.imm_int = expr->const_expr.ixx.i.low});
+                            VX_IR_VALUE_IMM_INT(expr->const_expr.ixx.i.low));
                 }
 
                 case CONST_BOOL: {
                     return vxcc_emit_constexpr(dest_block, cu, outTy,
-                                               (vx_IrValue) {.type = VX_IR_VAL_IMM_INT,.imm_int = expr->const_expr.b});
+                            VX_IR_VALUE_IMM_INT(expr->const_expr.b));
                 }
 
                 case CONST_ENUM: {
                     return vxcc_emit_constexpr(dest_block, cu, outTy,
-                                               (vx_IrValue) {.type = VX_IR_VAL_IMM_INT,.imm_int = expr->const_expr.enum_err_val->enum_constant.ordinal});
+                            VX_IR_VALUE_IMM_INT(expr->const_expr.enum_err_val->enum_constant.ordinal));
+                }
+
+                case CONST_INITIALIZER: {
+                    ConstInitializer* init = expr->const_expr.initializer;
+                    return VX_IRVAR_OPT_SOME(vxcc_emit_constinit(dest_block, cu, init));
                 }
 
                 case CONST_REF:
@@ -675,10 +702,9 @@ vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr)
                 case CONST_STRING:
                 case CONST_POINTER:
                 case CONST_TYPEID:
-                case CONST_INITIALIZER:
                 case CONST_UNTYPED_LIST:
                 case CONST_MEMBER:
-                    error_exit("constexprr kind %i currenlty not supported by VXCC backend", expr->const_expr.const_kind);
+                    error_exit("constexpr kind %i currenlty not supported by VXCC backend", expr->const_expr.const_kind);
             }
             break;
         }
