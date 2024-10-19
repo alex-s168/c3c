@@ -1,3 +1,10 @@
+fn void strcpy(char* dest, char* src) @export 
+{
+    for (usz i = 0; src[i] != '\0'; i ++)
+        dest[i] = src[i];
+}
+
+/*
 fn int max(int a, int b) @export 
 {
     int res;
@@ -100,4 +107,4 @@ fn int test2() @export
     Vec2i copy = vec;
     int y = vec.y;
     return y;
-}
+}*/
