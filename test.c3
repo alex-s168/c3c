@@ -1,10 +1,4 @@
-fn void strcpy(char* dest, char* src) @export 
-{
-    for (usz i = 0; src[i] != '\0'; i ++)
-        dest[i] = src[i];
-}
 
-/*
 fn int max(int a, int b) @export 
 {
     int res;
@@ -14,6 +8,12 @@ fn int max(int a, int b) @export
         res = b;
     }
     return res;
+}
+
+fn void strcpy(char* dest, char* src) @export 
+{
+    for (usz i = 0; src[i] != '\0'; i ++)
+        dest[i] = src[i];
 }
 
 fn int max2(int a, int b) @export
@@ -95,6 +95,7 @@ fn usz test(int a, int b) @export
     return ((usz) (&a)) + b;
 }
 
+/*
 struct Vec2i 
 {
     int x;
