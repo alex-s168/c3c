@@ -795,6 +795,7 @@ static void llvm_emit_member_addr(GenContext *c, BEValue *value, Decl *parent, D
 {
 	assert(member->resolve_status == RESOLVE_DONE);
 	Decl *found = NULL;
+
 	do
 	{
 		ArrayIndex index = find_member_index(parent, member);
@@ -1191,12 +1192,12 @@ static inline void llvm_emit_bitaccess(GenContext *c, BEValue *be_value, Expr *e
 static inline void llvm_emit_access_addr(GenContext *c, BEValue *be_value, Expr *expr)
 {
 	Expr *parent = expr->access_expr.parent;
-	llvm_emit_expr(c, be_value, parent);
-	Decl *member = expr->access_expr.ref;
-
 	Type *flat_type = type_flatten(parent->type);
 	if (flat_type->type_kind == TYPE_ENUM)
 	{
+		llvm_emit_expr(c, be_value, parent);
+		Decl *member = expr->access_expr.ref;
+
 		llvm_value_rvalue(c, be_value);
 		if (!flat_type->decl->backend_ref) llvm_get_typeid(c, parent->type);
 		assert(member->backend_ref);
@@ -1207,6 +1208,18 @@ static inline void llvm_emit_access_addr(GenContext *c, BEValue *be_value, Expr 
 		llvm_value_set_address(be_value, ptr, member->type, alignment);
 		return;
 	}
+	if (expr_is_deref(parent))
+	{
+		llvm_emit_expr(c, be_value, parent->unary_expr.expr);
+		llvm_value_rvalue(c, be_value);
+		llvm_value_set_address_abi_aligned(be_value, be_value->value, parent->type);
+	}
+	else
+	{
+		llvm_emit_expr(c, be_value, parent);
+	}
+	Decl *member = expr->access_expr.ref;
+
 	llvm_emit_member_addr(c, be_value, type_lowering(parent->type)->decl, member);
 }
 
@@ -1730,8 +1743,7 @@ void llvm_emit_initialize_reference_temporary_const(GenContext *c, BEValue *ref,
 	AlignSize alignment = type_alloca_alignment(initializer->type);
 	LLVMTypeRef type = LLVMTypeOf(value);
 	LLVMValueRef global_copy = llvm_add_global_raw(c, ".__const", type, alignment);
-	llvm_set_private_linkage(global_copy);
-	LLVMSetUnnamedAddress(global_copy, LLVMGlobalUnnamedAddr);
+	llvm_set_private_declaration(global_copy);
 
 	// Set the value and make it constant
 	LLVMSetInitializer(global_copy, value);
@@ -2955,7 +2967,7 @@ static void llvm_emit_slice_values(GenContext *c, Expr *slice, BEValue *parent_r
 
 	// Emit the start and end
 
-	Type *start_type;
+	Type *start_type = (Type*)INVALID_PTR;
 	Range range = slice->slice_expr.range;
 	BEValue start_index;
 	switch (range.range_type)
@@ -5056,8 +5068,7 @@ static void llvm_emit_const_expr(GenContext *c, BEValue *be_value, Expr *expr)
 					LLVMTypeRef val_type = llvm_get_type(c, init->type);
 					LLVMValueRef global_copy = llvm_add_global_raw(c, ".__const_slice", val_type, alignment);
 					LLVMSetInitializer(global_copy, value);
-					llvm_set_private_linkage(global_copy);
-					LLVMSetUnnamedAddress(global_copy, LLVMGlobalUnnamedAddr);
+					llvm_set_private_declaration(global_copy);
 					assert(type_is_arraylike(init->type));
 					LLVMValueRef val = llvm_emit_aggregate_two(c, type, global_copy,
 					                                           llvm_const_int(c, type_usz, init->type->array.len));
@@ -5131,8 +5142,7 @@ static void llvm_emit_const_expr(GenContext *c, BEValue *be_value, Expr *expr)
 			if (!is_bytes) size++;
 			if (is_array && type->array.len > size) size = type->array.len;
 			LLVMValueRef global_name = llvm_add_global_raw(c, is_bytes ? ".bytes" : ".str", LLVMArrayType(llvm_get_type(c, type_char), size), 1);
-			llvm_set_private_linkage(global_name);
-			LLVMSetUnnamedAddress(global_name, LLVMGlobalUnnamedAddr);
+			llvm_set_private_declaration(global_name);
 			LLVMSetGlobalConstant(global_name, 1);
 			LLVMValueRef data = is_bytes
 					? llvm_get_bytes(c, expr->const_expr.bytes.ptr, expr->const_expr.bytes.len)
@@ -5826,7 +5836,7 @@ static LLVMValueRef llvm_emit_dynamic_search(GenContext *c, LLVMValueRef type_id
 		func = c->dyn_find_function = LLVMAddFunction(c->module, ".dyn_search", c->dyn_find_function_type);
 
 		LLVMSetUnnamedAddress(func, LLVMGlobalUnnamedAddr);
-		LLVMSetLinkage(func, LLVMWeakODRLinkage);
+		LLVMSetLinkage(func, LLVMWeakAnyLinkage);
 		llvm_set_comdat(c, func);
 
 		LLVMBasicBlockRef entry;
@@ -6196,6 +6206,16 @@ static void llvm_emit_call_expr(GenContext *c, BEValue *result_value, Expr *expr
 		// 1d. Load it as a value
 		func = llvm_load_value_store(c, &func_value);
 
+		if (safe_mode_enabled())
+		{
+			LLVMValueRef check = LLVMBuildICmp(c->builder, LLVMIntEQ, func, LLVMConstNull(c->ptr_type), "checknull");
+			scratch_buffer_clear();
+			scratch_buffer_append("Calling null function pointer, '");
+			span_to_scratch(function->span);
+			scratch_buffer_append("' was null.");
+			llvm_emit_panic_on_true(c, check, scratch_buffer_to_string(), function->span, NULL, NULL, NULL);
+		}
+
 		// 1e. Calculate the function type
 		func_type = llvm_get_type(c, type);
 	}
@@ -6487,8 +6507,14 @@ DONE:
 
 static inline void llvm_emit_expr_block(GenContext *c, BEValue *be_value, Expr *expr)
 {
-	DEBUG_PUSH_LEXICAL_SCOPE(c, astptr(expr->expr_block.first_stmt)->span);
-	llvm_emit_return_block(c, be_value, expr->type, expr->expr_block.first_stmt, expr->expr_block.block_exit_ref);
+	AstId first_stmt = expr->expr_block.first_stmt;
+	if (!first_stmt)
+	{
+		llvm_emit_return_block(c, be_value, expr->type, first_stmt, expr->expr_block.block_exit_ref);
+		return;
+	}
+	DEBUG_PUSH_LEXICAL_SCOPE(c, astptr(first_stmt)->span);
+	llvm_emit_return_block(c, be_value, expr->type, first_stmt, expr->expr_block.block_exit_ref);
 	DEBUG_POP_LEXICAL_SCOPE(c);
 }
 

@@ -88,8 +88,8 @@ fn double _exp2(double x) @extern("exp2") @weak @nostrip
 	{
 		if (abstop - _top12d(0x1p-54) >= 0x80000000)
 		{
-			// Avoid spurious underflow for tiny x.  */
-			// Note: 0 is common input.  */
+			// Avoid spurious underflow for tiny x.
+			// Note: 0 is common input.
 			return WANT_ROUNDING ? 1.0 + x : 1.0;
 		}
 		if (abstop >= _top12d(1024.0))
@@ -110,8 +110,8 @@ fn double _exp2(double x) @extern("exp2") @weak @nostrip
 		if (2 * u > 2 * bitcast(928.0, ulong)) abstop = 0;
 	}
 	const SHIFT = __EXP2_DATA.exp2_shift;
-	// exp2(x) = 2^(k/N) * 2^r, with 2^r in [2^(-1/2N),2^(1/2N)].  */
-	// x = k/N + r, with int k and r in [-1/2N, 1/2N].  */
+	// exp2(x) = 2^(k/N) * 2^r, with 2^r in [2^(-1/2N),2^(1/2N)].
+	// x = k/N + r, with int k and r in [-1/2N, 1/2N].
 	double kd = x + SHIFT;
 	ulong ki = bitcast(kd, ulong); /* k.  */
 	kd -= SHIFT; /* k/N for int k.  */
@@ -126,10 +126,10 @@ fn double _exp2(double x) @extern("exp2") @weak @nostrip
 	/* Evaluation is optimized assuming superscalar pipelined execution.  */
 	double r2 = r * r;
 	const C1 = __EXP2_DATA.exp2_poly[0];
-    const C2 = __EXP2_DATA.exp2_poly[1];
-    const C3 = __EXP2_DATA.exp2_poly[2];
-    const C4 = __EXP2_DATA.exp2_poly[3];
-    const C5 = __EXP2_DATA.exp2_poly[4];
+	const C2 = __EXP2_DATA.exp2_poly[1];
+	const C3 = __EXP2_DATA.exp2_poly[2];
+	const C4 = __EXP2_DATA.exp2_poly[3];
+	const C5 = __EXP2_DATA.exp2_poly[4];
 	/* Without fma the worst case error is 0.5/N ulp larger.  */
 	/* Worst case error is less than 0.5+0.86/N+(abs poly error * 2^53) ulp.  */
 	double tmp = tail + r * C1 + r2 * (C2 + r * C3) + r2 * r2 * (C4 + r * C5);

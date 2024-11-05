@@ -52,7 +52,7 @@ static bool sema_check_section(SemaContext *context, Attr *attr);
 static inline bool sema_analyse_attribute_decl(SemaContext *context, SemaContext *c, Decl *decl, bool *erase_decl);
 
 static inline bool sema_analyse_typedef(SemaContext *context, Decl *decl, bool *erase_decl);
-static bool sema_analyse_decl_type(SemaContext *context, Type *type, SourceSpan span);
+static bool sema_analyse_variable_type(SemaContext *context, Type *type, SourceSpan span);
 static inline bool sema_analyse_define(SemaContext *context, Decl *decl, bool *erase_decl);
 static inline bool sema_analyse_distinct(SemaContext *context, Decl *decl, bool *erase_decl);
 
@@ -243,8 +243,10 @@ static inline bool sema_analyse_struct_member(SemaContext *context, Decl *parent
 			TypeInfo *type_info = type_infoptr(decl->var.type_info);
 			if (!sema_resolve_type_info(context, type_info, RESOLVE_TYPE_ALLOW_FLEXIBLE)) return decl_poison(decl);
 			Type *type = type_info->type;
-			switch (type_storage_type(type))
+			switch (sema_resolve_storage_type(context, type))
 			{
+				case STORAGE_ERROR:
+					return false;
 				case STORAGE_NORMAL:
 					break;
 				case STORAGE_VOID:
@@ -1147,6 +1149,7 @@ static inline bool sema_analyse_signature(SemaContext *context, Signature *sig, 
 		{
 			case VARDECL_PARAM_REF:
 				inferred_type = type_get_ptr(method_parent->type);
+				param->var.not_null = true;
 				if (!is_macro) param->var.kind = VARDECL_PARAM;
 				break;
 			case VARDECL_PARAM:
@@ -1692,8 +1695,10 @@ static inline bool sema_analyse_operator_element_at(SemaContext *context, Decl *
 	TypeInfo *rtype;
 	Decl **params;
 	if (!sema_analyse_operator_common(context, method, &rtype, &params, 2)) return false;
-	switch (type_storage_type(rtype->type))
+	switch (sema_resolve_storage_type(context, rtype->type))
 	{
+		case STORAGE_ERROR:
+			return false;
 		case STORAGE_NORMAL:
 			break;
 		case STORAGE_VOID:
@@ -2535,7 +2540,7 @@ static bool sema_analyse_attribute(SemaContext *context, ResolvedAttrData *attr_
 			RETURN_SEMA_ERROR(attr, "'operator' requires an operator type argument: '[]', '[]=', '&[]' or 'len'.");
 		}
 		case ATTRIBUTE_ADHOC:
-			decl->is_adhoc = true;
+			SEMA_DEPRECATED(attr, "'@adhoc' is deprecated.");
 			return true;
 		case ATTRIBUTE_ALIGN:
 			if (!expr)
@@ -3649,31 +3654,30 @@ static bool sema_analyse_attributes_for_var(SemaContext *context, Decl *decl, bo
 	return true;
 }
 
-static bool sema_analyse_decl_type(SemaContext *context, Type *type, SourceSpan span)
+static bool sema_analyse_variable_type(SemaContext *context, Type *type, SourceSpan span)
 {
-	switch (type_storage_type(type))
+	switch (sema_resolve_storage_type(context, type))
 	{
+		case STORAGE_ERROR:
+			return false;
 		case STORAGE_NORMAL:
 			return true;
 		case STORAGE_VOID:
 		case STORAGE_WILDCARD:
 			if (type_is_optional(type))
 			{
-				sema_error_at(context, span, "The use of 'void!' as a variable type is not permitted, use %s instead.",
-				              type_quoted_error_string(type_anyfault));
-			} else
-			{
-				sema_error_at(context, span, "The use of 'void' as a variable type is not permitted.");
+				RETURN_SEMA_ERROR_AT(span, "The use of %s as a variable type is not permitted, "
+				                           "catch the error using 'if (catch err = foo) { ... }',"
+										   " or use '@catch(foo)' to convert it to an 'anyfault'.",
+				                     type_quoted_error_string(type));
 			}
-			return false;
+			RETURN_SEMA_ERROR_AT(span, "The use of %s as a variable type is not permitted.", type_quoted_error_string(type));
 		case STORAGE_COMPILE_TIME:
-			sema_error_at(context, span, "The variable cannot have an compile time %s type.",
-			              type_quoted_error_string(type));
-			return false;
+			RETURN_SEMA_ERROR_AT(span, "The variable cannot have an compile time %s type.",
+			                     type_quoted_error_string(type));
 		case STORAGE_UNKNOWN:
-			sema_error_at(context, span, "%s has unknown size, and so it cannot be a variable type.",
-			              type_quoted_error_string(type));
-			return false;
+			RETURN_SEMA_ERROR_AT(span, "%s has unknown size, and so it cannot be a variable type.",
+			                     type_quoted_error_string(type));
 	}
 	UNREACHABLE
 }
@@ -3750,6 +3754,11 @@ bool sema_analyse_var_decl_ct(SemaContext *context, Decl *decl)
 			// If we don't have a type, resolve the expression.
 			if ((init = decl->var.init_expr))
 			{
+				if (init->expr_kind == EXPR_TYPEINFO)
+				{
+					SEMA_ERROR(init, "You can't assign a type to a regular compile time variable like '%s', but it would be allowed if the variable was a compile time type variable. Such a variable needs to have a type-like name, e.g. '$MyType'.", decl->name);
+					goto FAIL;
+				}
 				if (!sema_analyse_expr(context, init)) goto FAIL;
 				// Check it is constant.
 				if (!expr_is_runtime_const(init))
@@ -3866,8 +3875,10 @@ bool sema_analyse_var_decl(SemaContext *context, Decl *decl, bool local)
 				return decl_poison(decl);
 			}
 			decl->type = init_expr->type;
-			switch (type_storage_type(init_expr->type))
+			switch (sema_resolve_storage_type(context, init_expr->type))
 			{
+				case STORAGE_ERROR:
+					return decl_poison(decl);
 				case STORAGE_NORMAL:
 					break;
 				case STORAGE_WILDCARD:
@@ -3898,7 +3909,7 @@ bool sema_analyse_var_decl(SemaContext *context, Decl *decl, bool local)
 			{
 				if (!sema_set_alloca_alignment(context, decl->type, &decl->alignment)) return false;
 			}
-			if (!sema_analyse_decl_type(context, decl->type, init_expr->span)) return decl_poison(decl);
+			if (!sema_analyse_variable_type(context, decl->type, init_expr->span)) return decl_poison(decl);
 			// Skip further evaluation.
 			goto EXIT_OK;
 		}
@@ -3909,7 +3920,7 @@ bool sema_analyse_var_decl(SemaContext *context, Decl *decl, bool local)
 	                                                : RESOLVE_TYPE_DEFAULT)) return decl_poison(decl);
 
 	Type *type = decl->type = type_info->type;
-	if (!sema_analyse_decl_type(context, type, type_info->span)) return decl_poison(decl);
+	if (!sema_analyse_variable_type(context, type, type_info->span)) return decl_poison(decl);
 
 	type = type_no_optional(type);
 	if (type_is_user_defined(type) && type->decl)
@@ -4068,7 +4079,8 @@ static Module *module_instantiate_generic(SemaContext *context, Module *module, 
 	return new_module;
 }
 
-static bool sema_generate_parameterized_name_to_scratch(SemaContext *context, Module *module, Expr **params, bool mangled)
+static bool sema_generate_parameterized_name_to_scratch(SemaContext *context, Module *module, Expr **params,
+                                                        bool mangled, bool *was_recursive_ref)
 {
 	// First resolve
 	FOREACH_IDX(i, Expr *, param, params)
@@ -4076,15 +4088,17 @@ static bool sema_generate_parameterized_name_to_scratch(SemaContext *context, Mo
 		if (param->expr_kind == EXPR_TYPEINFO)
 		{
 			TypeInfo *type_info = param->type_expr;
+			if (was_recursive_ref && type_info->kind == TYPE_INFO_GENERIC) *was_recursive_ref = true;
 			if (!sema_resolve_type_info(context, type_info, RESOLVE_TYPE_DEFAULT)) return false;
 			Type *type = type_info->type->canonical;
 			if (type->type_kind == TYPE_OPTIONAL) RETURN_SEMA_ERROR(type_info, "Expected a non-optional type.");
-			switch (type_storage_type(type))
+			switch (sema_resolve_storage_type(context, type))
 			{
+				case STORAGE_ERROR:
+					return false;
 				case STORAGE_NORMAL:
-					break;
 				case STORAGE_VOID:
-					RETURN_SEMA_ERROR(type_info, "A 'void' type cannot be used as a parameter type.");
+					break;
 				case STORAGE_WILDCARD:
 					RETURN_SEMA_ERROR(type_info, "The type is undefined and cannot be used as a parameter type.");
 				case STORAGE_COMPILE_TIME:
@@ -4232,7 +4246,8 @@ static bool sema_analyse_generic_module_contracts(SemaContext *c, Module *module
 }
 
 
-Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, const char *name, SourceSpan span, Expr **params)
+Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, const char *name, SourceSpan span,
+                                            Expr **params, bool *was_recursive_ref)
 {
 	NameResolve name_resolve = {
 			.path = decl_path,
@@ -4255,7 +4270,7 @@ Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, con
 					  vec_size(params));
 		return poisoned_decl;
 	}
-	if (!sema_generate_parameterized_name_to_scratch(c, module, params, true)) return poisoned_decl;
+	if (!sema_generate_parameterized_name_to_scratch(c, module, params, true, was_recursive_ref)) return poisoned_decl;
 	TokenType ident_type = TOKEN_IDENT;
 	const char *path_string = scratch_buffer_interned();
 	Module *instantiated_module = global_context_find_module(path_string);
@@ -4269,7 +4284,7 @@ Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, con
 		path->span = module->name->span;
 		path->len = scratch_buffer.len;
 		instantiated_module = module_instantiate_generic(c, module, path, params, span);
-		if (!sema_generate_parameterized_name_to_scratch(c, module, params, false)) return poisoned_decl;
+		if (!sema_generate_parameterized_name_to_scratch(c, module, params, false, NULL)) return poisoned_decl;
 		if (!instantiated_module) return poisoned_decl;
 		instantiated_module->generic_suffix = scratch_buffer_copy();
 		if (c->unit->module->generic_module)
@@ -4296,7 +4311,16 @@ Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, con
 			return poisoned_decl;
 		}
 	}
-	if (!sema_analyse_decl(c, symbol)) return poisoned_decl;
+
+	CompilationUnit *unit = symbol->unit;
+	if (unit->module->stage < ANALYSIS_POST_REGISTER)
+	{
+		vec_add(unit->global_decls, symbol);
+	}
+	else
+	{
+		if (!sema_analyse_decl(c, symbol)) return poisoned_decl;
+	}
 	unit_register_external_symbol(c, symbol);
 	return symbol;
 }
@@ -4342,6 +4366,7 @@ static inline bool sema_analyse_define(SemaContext *context, Decl *decl, bool *e
 		RETURN_SEMA_ERROR(expr, "A global variable or function name was expected here.");
 	}
 	Decl *symbol = expr->identifier_expr.decl;
+	if (!sema_analyse_decl(context, symbol)) return false;
 	bool should_be_const = char_is_upper(decl->name[0]);
 	if (should_be_const)
 	{

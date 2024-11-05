@@ -529,6 +529,8 @@ void compiler_compile(void)
 				break;
 			case TARGET_TYPE_OBJECT_FILES:
 				break;
+			case TARGET_TYPE_PREPARE:
+				break;
 			default:
 				UNREACHABLE
 		}
@@ -866,6 +868,17 @@ void compile_clean(BuildOptions *options)
 void compile_file_list(BuildOptions *options)
 {
 	init_build_target(&compiler.build, options);
+	if (compiler.build.type == TARGET_TYPE_PREPARE)
+	{
+		if (options->command != COMMAND_BUILD)
+		{
+			error_exit("The target is a 'prepare' target, and only 'build' can be used with it.");
+		}
+		printf("] Running prepare target '%s'.\n", options->target_select);
+		execute_scripts();
+		printf("] Completed.\n.");
+		return;
+	}
 	if (options->command == COMMAND_CLEAN_RUN)
 	{
 		clean_obj_files();
@@ -1139,7 +1152,7 @@ static int jump_buffer_size()
 	UNREACHABLE
 }
 
-static void execute_scripts(void)
+void execute_scripts(void)
 {
 	if (!vec_size(compiler.build.exec)) return;
 	if (compiler.build.trust_level < TRUST_FULL)
@@ -1168,7 +1181,7 @@ static void execute_scripts(void)
 		}
 		scratch_buffer_clear();
 		scratch_buffer_append_len(call.ptr, call.len);
-		(void) compile_and_invoke(scratch_buffer_to_string(), execs.len ? execs.ptr : "", NULL);
+		(void) compile_and_invoke(scratch_buffer_copy(), execs.len ? execs.ptr : "", NULL);
 	}
 	dir_change(old_path);
 	free(old_path);
@@ -1547,6 +1560,7 @@ File *compile_and_invoke(const char *file, const char *args, const char *stdin_d
 	}
 	const char *compiler_path = file_append_path(find_executable_path(), name);
 
+	scratch_buffer_clear();
 	if (PLATFORM_WINDOWS) scratch_buffer_append_char('"');
 	scratch_buffer_append_native_safe_path(compiler_path, strlen(compiler_path));
 	const char *output = "__c3exec__";

@@ -629,14 +629,8 @@ bool cast_to_index(SemaContext *context, Expr *index, Type *subscripted_type)
 			type = type->decl->enums.type_info->type;
 			goto RETRY;
 		default:
-			if (!subscripted_type)
-			{
-				RETURN_SEMA_ERROR(index, "Cannot implicitly convert %s to an index.",
-				                  type_quoted_error_string(index->type));
-			}
-			RETURN_SEMA_ERROR(index, "Cannot implicitly convert %s to index %s.",
-			                  type_quoted_error_string(index->type),
-			                  type_quoted_error_string(subscripted_type));
+			RETURN_SEMA_ERROR(index, "An integer value was expected here, but it is a value of type %s, which can't be implicitly converted into an integer index.",
+			                  type_quoted_error_string(index->type));
 	}
 }
 
@@ -695,6 +689,21 @@ static bool report_cast_error(CastContext *cc, bool may_cast_explicit)
 	}
 	else
 	{
+		if (to->type_kind == TYPE_INTERFACE)
+		{
+			if (expr->type->canonical->type_kind != TYPE_POINTER)
+			{
+				RETURN_CAST_ERROR(expr,
+				                  "You can only convert pointers to an interface like %s. "
+								  "Try passing the address of the expression instead.",
+				                  type_quoted_error_string(to));
+			}
+		}
+		else if (to->type_kind == TYPE_ANY && expr->type->canonical->type_kind != TYPE_POINTER)
+		{
+			RETURN_CAST_ERROR(expr,  "You can only convert pointers to 'any'. "
+									 "Try passing the address of the expression instead.");
+		}
 		RETURN_CAST_ERROR(expr,
 		           "It is not possible to cast %s to %s.",
 		           type_quoted_error_string(type_no_optional(expr->type)), type_quoted_error_string(to));
@@ -713,6 +722,14 @@ INLINE bool sema_cast_error(CastContext *cc, bool may_cast_explicit, bool is_sil
 static TypeCmpResult match_pointers(CastContext *cc, Type *to_ptr, Type *from_ptr, bool flatten, bool is_silent)
 {
 	return type_is_pointer_equivalent(cc->context, to_ptr, from_ptr, flatten);
+}
+
+static bool rule_voidptr_to_any(CastContext *cc, bool is_explicit, bool is_silent)
+{
+	if (expr_is_const_pointer(cc->expr) && !cc->expr->const_expr.ptr) return true;
+	RETURN_CAST_ERROR(cc->expr,
+	                  "Casting a 'void*' to %s is not permitted (except when the 'void*' is a constant null).",
+	                  type_quoted_error_string(cc->to));
 }
 
 static bool rule_ptr_to_ptr(CastContext *cc, bool is_explicit, bool is_silent)
@@ -1120,7 +1137,6 @@ static bool rule_ptr_to_interface(CastContext *cc, bool is_explicit, bool is_sil
 	if (type_may_implement_interface(pointee))
 	{
 		Type *interface = cc->to;
-		Decl *pointee_decl = pointee->decl;
 		if (type_implements_interface(cc, pointee->decl, interface)) return true;
 	}
 	if (is_silent) return false;
@@ -2274,7 +2290,9 @@ static void cast_typeid_to_bool(SemaContext *context, Expr *expr, Type *to_type)
 #define RULST &rule_ulist_to_struct       /* Untyped list -> bitstruct or union                                                                */
 #define RULAR &rule_ulist_to_vecarr       /* Untyped list -> vector or array                                                                   */
 #define RULFE &rule_ulist_to_inferred     /* Untyped list -> inferred vector or array                                                          */
-#define RULSL &rule_ulist_to_slice        /* Untyped list -> slice                                                                          */
+#define RULSL &rule_ulist_to_slice        /* Untyped list -> slice                                                                             */
+#define RVPAN &rule_voidptr_to_any        /* void* -> interface/any                                                                            */
+
 CastRule cast_rules[CONV_LAST + 1][CONV_LAST + 1] = {
 // void, wildc,  bool,   int, float,   ptr, slice,   vec, bitst, distc, array, strct, union,   any,  infc, fault,  enum, func,  typid, afaul, voidp, arrpt, infer, ulist (to)
  {_NA__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__}, // VOID    (from)
@@ -2297,7 +2315,7 @@ CastRule cast_rules[CONV_LAST + 1][CONV_LAST + 1] = {
  {REXPL, _NO__, REXPL, RPTIN, _NO__, _NO__, _NO__, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, RPTPT, _NO__, _NO__, ROKOK, _NO__, _NO__, _NO__}, // FUNC
  {REXPL, _NO__, REXPL, RPTIN, _NO__, REXPL, _NO__, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NA__, _NO__, REXPL, REXPL, _NO__, _NO__}, // TYPEID
  {REXPL, _NO__, REXPL, RPTIN, _NO__, REXPL, _NO__, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, _NO__, _NO__, RAFFA, _NO__, _NO__, _NO__, _NA__, REXPL, REXPL, _NO__, _NO__}, // ANYFAULT
- {REXPL, _NO__, REXPL, RPTIN, _NO__, ROKOK, _NO__, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, ROKOK, ROKOK, _NO__, _NO__, ROKOK, _NO__, _NO__, _NA__, ROKOK, _NO__, _NO__}, // VOIDPTR
+ {REXPL, _NO__, REXPL, RPTIN, _NO__, ROKOK, _NO__, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, RVPAN, RVPAN, _NO__, _NO__, ROKOK, _NO__, _NO__, _NA__, ROKOK, _NO__, _NO__}, // VOIDPTR
  {REXPL, _NO__, REXPL, RPTIN, _NO__, RPTPT, RAPSL, REXVC, _NO__, RXXDI, _NO__, _NO__, _NO__, ROKOK, ROKOK, _NO__, _NO__, _NO__, _NO__, _NO__, ROKOK, RPTPT, RPTFE, _NO__}, // ARRPTR
  {_NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__}, // INFERRED
  {_NO__, _NO__, _NO__, _NO__, _NO__, _NO__, RULSL, RULAR, RULST, RXXDI, RULAR, RULST, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, _NO__, RULFE, _NO__}, // UNTYPED_LIST

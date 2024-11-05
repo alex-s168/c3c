@@ -247,6 +247,7 @@ static inline bool sema_analyse_continue_stmt(SemaContext *context, Ast *stateme
 
 	// Link the parent and add the defers.
 	statement->contbreak_stmt.ast = astid(parent);
+	statement->contbreak_stmt.is_resolved = true;
 	statement->contbreak_stmt.defers = context_get_defers(context, context->active_scope.defer_last, defer_id, true);
 	return true;
 }
@@ -2147,7 +2148,7 @@ static inline bool sema_analyse_compound_statement_no_scope(SemaContext *context
 			all_ok = false;
 		}
 	}
-	AstId *next = ast ? &ast->next : &compound_statement->compound_stmt.first_stmt;
+	AstId *next = ast ? &ast_last(ast)->next : &compound_statement->compound_stmt.first_stmt;
 	context_pop_defers(context, next);
 	return all_ok;
 }
@@ -3016,7 +3017,6 @@ static bool sema_analyse_ensure(SemaContext *context, Ast *directive)
 static bool sema_analyse_optional_returns(SemaContext *context, Ast *directive)
 {
 	Ast **returns = NULL;
-	context->call_env.opt_returns = NULL;
 	FOREACH(Ast *, ret, directive->contract_stmt.faults)
 	{
 		if (ret->contract_fault.resolved) continue;
@@ -3044,8 +3044,9 @@ static bool sema_analyse_optional_returns(SemaContext *context, Ast *directive)
 			}
 		}
 		RETURN_SEMA_ERROR(ret, "No fault value '%s' found.", ident);
-	NEXT:;
-		vec_add(context->call_env.opt_returns, ret->contract_fault.decl);
+NEXT:;
+		Decl *d = ret->contract_fault.decl;
+		vec_add(context->call_env.opt_returns, d);
 	}
 	return true;
 }
@@ -3062,6 +3063,7 @@ void sema_append_contract_asserts(AstId assert_first, Ast* compound_stmt)
 
 bool sema_analyse_contracts(SemaContext *context, AstId doc, AstId **asserts, SourceSpan call_span, bool *has_ensures)
 {
+	context->call_env.opt_returns = NULL;
 	while (doc)
 	{
 		Ast *directive = astptr(doc);

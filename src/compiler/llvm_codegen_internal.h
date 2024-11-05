@@ -83,6 +83,7 @@ typedef struct GenContext_
 {
 	bool shared_context;
 	bool in_init_ref;
+	bool weaken;
 	LLVMModuleRef module;
 	LLVMBuilderRef global_builder;
 	LLVMTargetMachineRef machine;
@@ -363,10 +364,12 @@ void llvm_attribute_add_type(GenContext *c, LLVMValueRef value_to_add_attribute_
 void llvm_attribute_add_int(GenContext *c, LLVMValueRef value_to_add_attribute_to, unsigned attribute, uint64_t val, int index);
 
 // -- Linking --
+void llvm_set_selector_linkage(GenContext *c, LLVMValueRef selector);
 void llvm_set_linkonce(GenContext *c, LLVMValueRef global);
 void llvm_set_comdat(GenContext *c, LLVMValueRef global);
-void llvm_set_weak(GenContext *c, LLVMValueRef global);
-void llvm_set_private_linkage(LLVMValueRef alloc);
+void llvm_set_private_declaration(LLVMValueRef alloc);
+void llvm_set_decl_linkage(GenContext *c, Decl *decl);
+
 void llvm_set_internal_linkage(LLVMValueRef alloc);
 void llvm_set_global_tls(Decl *decl);
 
@@ -576,6 +579,8 @@ void llvm_emit_debug_local_var(GenContext *c, Decl *var);
 #define POP_DEFER_ERROR() c->defer_error_var = def_err__
 
 LLVMAtomicOrdering llvm_atomic_ordering(Atomicity atomicity);
+
+bool module_should_weaken(Module *module);
 
 // Implementations
 

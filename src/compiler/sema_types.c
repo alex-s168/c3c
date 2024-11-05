@@ -282,7 +282,7 @@ static bool sema_resolve_type_identifier(SemaContext *context, TypeInfo *type_in
 INLINE bool sema_resolve_evaltype(SemaContext *context, TypeInfo *type_info, ResolveTypeKind resolve_kind)
 {
 	Expr *expr = type_info->unresolved_type_expr;
-	Expr *inner = sema_ct_eval_expr(context, "$evaltype", expr, true);
+	Expr *inner = sema_ct_eval_expr(context, true, expr, true);
 	if (!inner) return type_info_poison(type_info);
 	if (inner->expr_kind != EXPR_TYPEINFO)
 	{
@@ -291,8 +291,10 @@ INLINE bool sema_resolve_evaltype(SemaContext *context, TypeInfo *type_info, Res
 	}
 	TypeInfo *inner_type = inner->type_expr;
 	if (!sema_resolve_type(context, inner_type, resolve_kind)) return false;
-	switch (type_storage_type(inner_type->type))
+	switch (sema_resolve_storage_type(context, inner_type->type))
 	{
+		case STORAGE_ERROR:
+			return false;
 		case STORAGE_VOID:
 		case STORAGE_UNKNOWN:
 		case STORAGE_NORMAL:
@@ -313,14 +315,21 @@ INLINE bool sema_resolve_typeof(SemaContext *context, TypeInfo *type_info)
 	if (!sema_analyse_expr_value(context, expr)) return false;
 	Type *expr_type = expr->type;
 	if (expr_type->type_kind == TYPE_FUNC_RAW) expr_type = type_get_func_ptr(expr_type);
-	switch (type_storage_type(expr_type))
+	switch (sema_resolve_storage_type(context, expr_type))
 	{
+		case STORAGE_ERROR:
+			return false;
 		case STORAGE_NORMAL:
 		case STORAGE_VOID:
 		case STORAGE_UNKNOWN:
 			type_info->type = expr_type;
 			return true;
 		case STORAGE_WILDCARD:
+			if (expr_type->type_kind == TYPE_OPTIONAL)
+			{
+				type_info->type = type_get_optional(type_void);
+				return true;
+			}
 			RETURN_SEMA_ERROR(expr, "This %sexpression lacks a concrete type.", type_is_optional(expr_type) ? "optional " : "");
 		case STORAGE_COMPILE_TIME:
 			RETURN_SEMA_ERROR(expr, "This expression has a compile time type %s.", type_quoted_error_string(expr_type));
@@ -360,19 +369,20 @@ INLINE bool sema_resolve_generic_type(SemaContext *context, TypeInfo *type_info)
 	TypeInfo *inner = type_info->generic.base;
 	if (inner->kind != TYPE_INFO_IDENTIFIER && inner->subtype != TYPE_COMPRESSED_NONE && !inner->optional)
 	{
-		SEMA_ERROR(inner, "Parameterization required a concrete type name here.");
-		return false;
+		RETURN_SEMA_ERROR(inner, "Parameterization required a concrete type name here.");
 	}
 	assert(inner->resolve_status == RESOLVE_NOT_DONE);
 
-	Decl *type = sema_analyse_parameterized_identifier(context, inner->unresolved.path, inner->unresolved.name, inner->span, type_info->generic.params);
+	bool was_recursive = false;
+	Decl *type = sema_analyse_parameterized_identifier(context, inner->unresolved.path, inner->unresolved.name,
+	                                                   inner->span, type_info->generic.params, &was_recursive);
 	if (!decl_ok(type)) return false;
 	type_info->type = type->type;
-	if (!type->is_adhoc && !context->current_macro && (context->call_env.kind == CALL_ENV_FUNCTION || context->call_env.kind == CALL_ENV_FUNCTION_STATIC)
-		&& !context->call_env.current_function->func_decl.in_macro)
+	if (!was_recursive) return true;
+	if (!context->current_macro && (context->call_env.kind == CALL_ENV_FUNCTION || context->call_env.kind == CALL_ENV_FUNCTION_STATIC)
+	    && !context->call_env.current_function->func_decl.in_macro)
 	{
-
-		SEMA_DEPRECATED(type_info, "Direct generic type declarations not marked '@adhoc' outside of macros and type declarations is a deprecated feature, please use 'def' to create an alias.");
+		SEMA_DEPRECATED(type_info, "Nested generic type declarations outside of macros is a deprecated feature, please use 'def' to create an alias.");
 		// TODO, completely disallow
 		// RETURN_SEMA_ERROR(type_info, "Direct generic type declarations are only allowed inside of macros. Use `def` to define an alias for the type instead.");
 	}

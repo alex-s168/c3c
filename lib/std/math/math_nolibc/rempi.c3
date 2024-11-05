@@ -23,11 +23,11 @@ import std::math;
  * use __rem_pio2_large() for large x
  */
 
-/*
+<*
  * invpio2:  53 bits of 2/pi
  * pio2_1:   first 25 bits of pi/2
  * pio2_1t:  pi/2 - pio2_1
- */
+ *>
 fn int __rem_pio2f(float x, double *y)
 {
 	const double PIO4 = 0x1.921fb6p-1;
@@ -62,7 +62,7 @@ fn int __rem_pio2f(float x, double *y)
 	}
 	if (ix >= 0x7f800000)
 	{
-		// x is inf or NaN */
+		// x is inf or NaN
 		*y = x - (double)x;
 		return 0;
 	}
@@ -181,9 +181,9 @@ fn int __rem_pio2_large(double* x, double* y, int e0, int nx, int prec)
 				iq[jz - 1] -= i << (24 - q0);
 				ih = iq[jz - 1] >> (23 - q0);
 			case q0 == 0:
-			    ih = iq[jz - 1] >> 23;
+				ih = iq[jz - 1] >> 23;
 			case z >= 0.5:
-			    ih = 2;
+				ih = 2;
 		}
 		if (ih > 0)
 		{
@@ -192,7 +192,7 @@ fn int __rem_pio2_large(double* x, double* y, int e0, int nx, int prec)
 			int carry = 0;
 			for (int i = 0; i < jz; i++)
 			{
-			    /* compute 1-q */
+				/* compute 1-q */
 				j = iq[i];
 				if (carry == 0)
 				{
@@ -365,17 +365,17 @@ fn int __rem_pio2_large(double* x, double* y, int e0, int nx, int prec)
  * pio2_3t:  pi/2 - (pio2_1+pio2_2+pio2_3)
  */
 
-/* caller must handle the case when reduction is not needed: |x| ~<= pi/4 */
+<* caller must handle the case when reduction is not needed: |x| ~<= pi/4 *>
 fn int __rem_pio2(double x, double *y)
 {
 	const double PIO4 = 0x1.921fb54442d18p-1;
-    const double INVPIO2 = 6.36619772367581382433e-01; /* 0x3FE45F30, 0x6DC9C883 */
-    const double PIO2_1 = 1.57079632673412561417e+00; /* 0x3FF921FB, 0x54400000 */
-    const double PIO2_1T = 6.07710050650619224932e-11; /* 0x3DD0B461, 0x1A626331 */
-    const double PIO2_2 = 6.07710050630396597660e-11; /* 0x3DD0B461, 0x1A600000 */
-    const double PIO2_2T = 2.02226624879595063154e-21; /* 0x3BA3198A, 0x2E037073 */
-    const double PIO2_3 = 2.02226624871116645580e-21; /* 0x3BA3198A, 0x2E000000 */
-    const double PIO2_3T = 8.47842766036889956997e-32; /* 0x397B839A, 0x252049C1 */
+	const double INVPIO2 = 6.36619772367581382433e-01; /* 0x3FE45F30, 0x6DC9C883 */
+	const double PIO2_1 = 1.57079632673412561417e+00; /* 0x3FF921FB, 0x54400000 */
+	const double PIO2_1T = 6.07710050650619224932e-11; /* 0x3DD0B461, 0x1A626331 */
+	const double PIO2_2 = 6.07710050630396597660e-11; /* 0x3DD0B461, 0x1A600000 */
+	const double PIO2_2T = 2.02226624879595063154e-21; /* 0x3BA3198A, 0x2E037073 */
+	const double PIO2_3 = 2.02226624871116645580e-21; /* 0x3BA3198A, 0x2E000000 */
+	const double PIO2_3T = 8.47842766036889956997e-32; /* 0x397B839A, 0x252049C1 */
 
 	ulong u = bitcast(x, ulong);
 	int sign = (int)(u >> 63);
@@ -452,37 +452,37 @@ fn int __rem_pio2(double x, double *y)
 		case ix < 0x413921fb:
 			break; // medium
 		case ix >= 0x7ff00000:
-		    // x is inf or NaN */
-            y[0] = y[1] = x - x;
-            return 0;
+			// x is inf or NaN
+			y[0] = y[1] = x - x;
+			return 0;
 		default:
 			// all other (large) arguments
-        	// set z = scalbn(|x|,-ilogb(x)+23)
-        	u = bitcast(x, ulong);
-        	u &= ((ulong)-1) >> 12;
-        	u |= (ulong)(0x3ff + 23) << 52;
-        	double z = bitcast(u, double);
-        	double[3] tx;
-        	int i;
-        	for (i = 0; i < 2; i++)
-        	{
-        		tx[i] = (double)(int)z;
-        		z = (z - tx[i]) * 0x1p24;
-        	}
-        	tx[i] = z;
-        	// skip zero terms, first term is non-zero
-        	while (tx[i] == 0.0) i--;
-        	double[2] ty;
-        	int n = __rem_pio2_large(&tx, &ty, (int)(ix >> 20) - (0x3ff + 23), i + 1, 1);
-        	if (sign)
-        	{
-        		y[0] = -ty[0];
-        		y[1] = -ty[1];
-        		return -n;
-        	}
-        	y[0] = ty[0];
-        	y[1] = ty[1];
-        	return n;
+			// set z = scalbn(|x|,-ilogb(x)+23)
+			u = bitcast(x, ulong);
+			u &= ((ulong)-1) >> 12;
+			u |= (ulong)(0x3ff + 23) << 52;
+			double z = bitcast(u, double);
+			double[3] tx;
+			int i;
+			for (i = 0; i < 2; i++)
+			{
+				tx[i] = (double)(int)z;
+				z = (z - tx[i]) * 0x1p24;
+			}
+			tx[i] = z;
+			// skip zero terms, first term is non-zero
+			while (tx[i] == 0.0) i--;
+			double[2] ty;
+			int n = __rem_pio2_large(&tx, &ty, (int)(ix >> 20) - (0x3ff + 23), i + 1, 1);
+			if (sign)
+			{
+				y[0] = -ty[0];
+				y[1] = -ty[1];
+				return -n;
+			}
+			y[0] = ty[0];
+			y[1] = ty[1];
+			return n;
 	}
 
 	// |x| ~< 2^20*(pi/2), medium size
@@ -512,7 +512,7 @@ fn int __rem_pio2(double x, double *y)
 	int ex = (int)(ix >> 20);
 	if (ex - ey > 16)
 	{
-		// 2nd round, good to 118 bits */
+		// 2nd round, good to 118 bits
 		double t = r;
 		w = fnn * PIO2_2;
 		r = t - w;

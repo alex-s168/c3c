@@ -16,7 +16,7 @@ module std::math::nolibc @if(env::NO_LIBC);
  * ====================================================
  */
 
-fn void sincosf(float x, float *sin, float *cos) @extern("sincosf") @weak @nostrip
+fn void sincosf(float x, float *sin, float *cos) @extern("__sincosf") @weak @nostrip
 {
 
 	uint ix = bitcast(x, uint);
@@ -64,20 +64,20 @@ fn void sincosf(float x, float *sin, float *cos) @extern("sincosf") @weak @nostr
 			if (ix <= 0x40afeddf)
 			{
 				// |x| ~<= 7*pi/4
-        		if (sign)
-        		{
-        		    *sin = __cosdf(x + S3PI2);
-        			*cos = -__sindf(x + S3PI2);
-        			return;
-        		}
-        		*sin = -__cosdf(x - S3PI2);
-        		*cos = __sindf(x - S3PI2);
-        		return;
-        	}
-        	*sin = __sindf(sign ? x + S4PI2 : x - S4PI2);
-        	*cos = __cosdf(sign ? x + S4PI2 : x - S4PI2);
-        case ix >= 0x7f800000:
-            // sin(Inf or NaN) is NaN
+				if (sign)
+				{
+					*sin = __cosdf(x + S3PI2);
+					*cos = -__sindf(x + S3PI2);
+					return;
+				}
+				*sin = -__cosdf(x - S3PI2);
+				*cos = __sindf(x - S3PI2);
+				return;
+			}
+			*sin = __sindf(sign ? x + S4PI2 : x - S4PI2);
+			*cos = __cosdf(sign ? x + S4PI2 : x - S4PI2);
+		case ix >= 0x7f800000:
+			// sin(Inf or NaN) is NaN
 			*sin = *cos = x - x;
 		default:
 			// general argument reduction needed
@@ -105,7 +105,7 @@ fn void sincosf(float x, float *sin, float *cos) @extern("sincosf") @weak @nostr
 
 }
 
-fn void sincos(double x, double *sin, double *cos) @extern("sincos") @weak @nostrip
+fn void sincos(double x, double *sin, double *cos) @extern("__sincos") @weak @nostrip
 {
 	// High word of x.
 	uint ix = (uint)(bitcast(x, ulong) >> 32);
@@ -129,8 +129,8 @@ fn void sincos(double x, double *sin, double *cos) @extern("sincos") @weak @nost
 			*cos = __cos(x, 0.0);
 		// sincos(Inf or NaN) is NaN
 		case ix >= 0x7ff00000:
-    		*sin = *cos = x - x;
-    	default:
+			*sin = *cos = x - x;
+		default:
 			// argument reduction needed
 			double[2] y;
 			int n = __rem_pio2(x, &y);

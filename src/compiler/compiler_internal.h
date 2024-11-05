@@ -71,6 +71,8 @@ typedef uint16_t FileId;
 #define EXPAND_EXPR_STRING(str_) (str_)->const_expr.bytes.len, (str_)->const_expr.bytes.ptr
 #define TABLE_MAX_LOAD 0.5
 
+#define INVALID_PTR ((void*)(uintptr_t)0xAAAAAAAAAAAAAAAA)
+
 typedef struct Ast_ Ast;
 typedef struct Decl_ Decl;
 typedef struct TypeInfo_ TypeInfo;
@@ -602,7 +604,6 @@ typedef struct Decl_
 	bool no_strip : 1;
 	bool is_cond : 1;
 	bool is_if : 1;
-	bool is_adhoc : 1;
 	bool attr_nopadding : 1;
 	bool attr_compact : 1;
 	bool resolved_attributes : 1;
@@ -1891,6 +1892,7 @@ extern const char *kw_at_jump;
 extern const char *kw_in;
 extern const char *kw_inout;
 extern const char *kw_len;
+extern const char *kw_libc;
 extern const char *kw_main;
 extern const char *kw_mainstub;
 extern const char *kw_memcmp;
@@ -2591,6 +2593,17 @@ INLINE bool type_is_wildcard(Type *type)
 	return type == type_wildcard || type == type_wildcard_optional;
 }
 
+INLINE bool type_is_fault_raw(Type *type)
+{
+	switch (type->type_kind)
+	{
+		case TYPE_FAULTTYPE:
+		case TYPE_ANYFAULT:
+			return true;
+		default:
+			return false;
+	}
+}
 INLINE bool type_is_any_raw(Type *type)
 {
 	switch (type->type_kind)
@@ -2806,37 +2819,6 @@ INLINE const char *type_invalid_storage_type_name(Type *type)
 	}
 }
 
-static inline StorageType type_storage_type(Type *type)
-{
-	if (!type) return STORAGE_NORMAL;
-	bool is_distinct = false;
-	RETRY:
-	if (type == type_wildcard_optional) return STORAGE_WILDCARD;
-	switch (type->type_kind)
-	{
-		case TYPE_VOID:
-			return is_distinct ? STORAGE_UNKNOWN : STORAGE_VOID;
-		case TYPE_WILDCARD:
-			return STORAGE_WILDCARD;
-		case TYPE_MEMBER:
-		case TYPE_UNTYPED_LIST:
-		case TYPE_TYPEINFO:
-		case TYPE_FUNC_RAW:
-			return STORAGE_COMPILE_TIME;
-		case TYPE_OPTIONAL:
-			type = type->optional;
-			goto RETRY;
-		case TYPE_TYPEDEF:
-			type = type->canonical;
-			goto RETRY;
-		case TYPE_DISTINCT:
-			is_distinct = true;
-			type = type->decl->distinct->type;
-			goto RETRY;
-		default:
-			return STORAGE_NORMAL;
-	}
-}
 
 INLINE TypeInfo *type_info_new(TypeInfoKind kind, SourceSpan span)
 {

@@ -1,10 +1,10 @@
 // #target: macos-x64
 
-/**
- * @require Token.kindof == ENUM && $typefrom(Token.inner).kindof == UNSIGNED_INT
- * @require $defined(((Token)0).token)
- * @require $defined(((Comment)0).start) && $defined(((Comment)0).end)
- **/
+<*
+ @require Token.kindof == ENUM && $typefrom(Token.inner).kindof == UNSIGNED_INT
+ @require $defined(((Token)0).token)
+ @require $defined(((Comment)0).start) && $defined(((Comment)0).end)
+ *>
 module lexer(<Token, Comment>);
 import std::io;
 import trie;
@@ -462,9 +462,9 @@ fn int main(String[] args)
 	io::printn("Hello, World!");
 	return 0;
 }
-/**
- * @require Index.kindof == TypeKind.UNSIGNED_INT
- **/
+<*
+ @require Index.kindof == TypeKind.UNSIGNED_INT
+ *>
 module trie(<Value, Index>);
 import std::collections::list;
 import trie::bitmap;
@@ -496,17 +496,17 @@ fn void Trie.init(&self, usz initial_capacity = 8, Allocator using = allocator::
     self.nodes.push(TrieNode{});
 }
 
-/**
- * @require self.nodes.len() > 0
- **/
+<*
+ @require self.nodes.len() > 0
+ *>
 fn Value! Trie.get(&self, char[] key)
 {
     return self.nodes[0].get(self, key);
 }
 
-/**
- * @require self.nodes.len() > 0
- **/
+<*
+  @require self.nodes.len() > 0
+ *>
 fn Value! Trie.get_best(&self, char[] key)
 {
     TrieNode* root = &self.nodes[0];
@@ -514,17 +514,17 @@ fn Value! Trie.get_best(&self, char[] key)
     return root.get_best(self, key, 0);
 }
 
-/**
- * @require self.nodes.len() > 0
- **/
+<*
+ @require self.nodes.len() > 0
+ *>
 fn void! Trie.set(&self, char[] key, Value value)
 {
     self.nodes[0].set(self, key, value)!!;
 }
 
-/**
- * @require self.nodes.len() > 0
- **/
+<*
+ @require self.nodes.len() > 0
+ *>
 fn void! Trie.del(&self, char[] key)
 {
     if (key.len == 0)
@@ -709,7 +709,7 @@ fn void test()
 @.str.5 = private unnamed_addr constant [3 x i8] c"*/\00", align 1
 @"lexer_test.Comment$end" = linkonce constant [2 x %"char[]"] [%"char[]" { ptr @.str.4, i64 1 }, %"char[]" { ptr @.str.5, i64 2 }], align 8
 @"$ct.std.io.ByteReader" = linkonce global %.introspect { i8 10, i64 0, ptr null, i64 24, i64 0, i64 2, [0 x i64] zeroinitializer }, align 8
-@std.core.mem.allocator.thread_allocator = external thread_local global %any, align 8
+@std.core.mem.allocator.thread_allocator = extern_weak thread_local global %any, align 8
 
 ; Function Attrs:
 define zeroext i8 @lexer_test.is_ident_char(i64 %0, i8 zeroext %1) #0 {

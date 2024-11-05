@@ -10,13 +10,14 @@ struct ArenaAllocator (Allocator)
 	usz used;
 }
 
-/**
- * Initialize a memory arena for use using the provided bytes.
- **/
-fn void ArenaAllocator.init(&self, char[] data)
+<*
+ Initialize a memory arena for use using the provided bytes.
+*>
+fn ArenaAllocator* ArenaAllocator.init(&self, char[] data)
 {
 	self.data = data;
 	self.used = 0;
+	return self;
 }
 
 fn void ArenaAllocator.clear(&self)
@@ -30,9 +31,9 @@ struct ArenaAllocatorHeader @local
 	char[*] data;
 }
 
-/*
- * @require ptr != null
- **/
+<*
+ @require ptr != null
+*>
 fn void ArenaAllocator.release(&self, void* ptr, bool) @dynamic
 {
 	assert((uptr)ptr >= (uptr)self.data.ptr, "Pointer originates from a different allocator.");
@@ -47,11 +48,11 @@ fn void ArenaAllocator.release(&self, void* ptr, bool) @dynamic
 fn usz ArenaAllocator.mark(&self) @dynamic => self.used;
 fn void ArenaAllocator.reset(&self, usz mark) @dynamic => self.used = mark;
 
-/**
- * @require !alignment || math::is_power_of_2(alignment)
- * @require alignment <= mem::MAX_MEMORY_ALIGNMENT `alignment too big`
- * @require size > 0
- **/
+<*
+ @require !alignment || math::is_power_of_2(alignment)
+ @require alignment <= mem::MAX_MEMORY_ALIGNMENT `alignment too big`
+ @require size > 0
+*>
 fn void*! ArenaAllocator.acquire(&self, usz size, AllocInitType init_type, usz alignment) @dynamic
 {
 	alignment = alignment_for_allocation(alignment);
@@ -69,12 +70,12 @@ fn void*! ArenaAllocator.acquire(&self, usz size, AllocInitType init_type, usz a
 	return mem;
 }
 
-/**
- * @require !alignment || math::is_power_of_2(alignment)
- * @require alignment <= mem::MAX_MEMORY_ALIGNMENT `alignment too big`
- * @require old_pointer != null
- * @require size > 0
- **/
+<*
+ @require !alignment || math::is_power_of_2(alignment)
+ @require alignment <= mem::MAX_MEMORY_ALIGNMENT `alignment too big`
+ @require old_pointer != null
+ @require size > 0
+*>
 fn void*! ArenaAllocator.resize(&self, void *old_pointer, usz size, usz alignment) @dynamic
 {
 	alignment = alignment_for_allocation(alignment);

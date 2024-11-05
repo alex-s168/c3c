@@ -372,7 +372,14 @@ Expr *copy_expr(CopyStruct *c, Expr *source_expr)
 				}
 				else
 				{
-					MACRO_COPY_DECL(expr->try_unwrap_expr.decl);
+					if (expr->try_unwrap_expr.optional)
+					{
+						MACRO_COPY_DECL(expr->try_unwrap_expr.decl);
+					}
+					else
+					{
+						fixup_decl(c, &expr->try_unwrap_expr.decl);
+					}
 				}
 			}
 			return expr;
@@ -941,6 +948,7 @@ Decl *copy_decl(CopyStruct *c, Decl *decl)
 		case DECL_ERASED:
 			break;
 		case DECL_INTERFACE:
+			copy_decl_type(copy);
 			MACRO_COPY_TYPE_LIST(copy->interfaces);
 			MACRO_COPY_DECL_LIST(copy->methods);
 			MACRO_COPY_DECL_LIST(copy->interface_methods);

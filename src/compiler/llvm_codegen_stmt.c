@@ -54,7 +54,6 @@ void llvm_emit_local_static(GenContext *c, Decl *decl, BEValue *value)
 		decl->var.optional_ref = llvm_add_global_raw(c, scratch_buffer_to_string(), anyfault, 0);
 	}
 	llvm_emit_global_variable_init(c, decl);
-
 	// Pop the builder
 	c->builder = builder;
 	llvm_value_set_decl(c, value, decl);
@@ -850,7 +849,7 @@ static void llvm_emit_switch_jump_table(GenContext *c,
 	LLVMValueRef jmptable = llvm_add_global_raw(c, "jumptable", llvm_array_type, alignment);
 	switch_ast->switch_stmt.codegen.jump.jmptable = jmptable;
 
-	llvm_set_private_linkage(jmptable);
+	llvm_set_private_declaration(jmptable);
 	LLVMSetGlobalConstant(jmptable, 1);
 	BEValue array_value;
 
@@ -1071,6 +1070,7 @@ void llvm_emit_break(GenContext *c, Ast *ast)
 
 void llvm_emit_continue(GenContext *c, Ast *ast)
 {
+	assert(ast->contbreak_stmt.is_resolved);
 	llvm_emit_statement_chain(c, ast->contbreak_stmt.defers);
 	Ast *jump_target = astptr(ast->contbreak_stmt.ast);
 	LLVMBasicBlockRef jump;

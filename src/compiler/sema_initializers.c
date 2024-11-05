@@ -42,8 +42,8 @@ static inline void sema_update_const_initializer_with_designator(
 
 bool const_init_local_init_may_be_global_inner(ConstInitializer *init, bool top)
 {
-	ConstInitializer **list;
-	unsigned len;
+	ConstInitializer **list = INVALID_PTR;
+	unsigned len = (unsigned)-1;
 	switch (init->kind)
 	{
 		case CONST_INIT_ZERO:
@@ -793,7 +793,12 @@ bool sema_expr_analyse_initializer_list(SemaContext *context, Type *to, Expr *ex
 	{
 		case TYPE_ANY:
 		case TYPE_INTERFACE:
-			UNREACHABLE
+			if (is_zero_init)
+			{
+				expr_rewrite_to_const_zero(expr, to);
+				return true;
+			}
+			break;
 		case TYPE_UNTYPED_LIST:
 		case TYPE_STRUCT:
 		case TYPE_UNION:
@@ -1313,3 +1318,4 @@ static Decl *sema_resolve_element_for_name(SemaContext *context, Decl **decls, D
 	(*index)++;
 	return found;
 }
+

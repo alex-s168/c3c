@@ -19,6 +19,7 @@
 
 #define SEMA_ERROR(_node, ...) sema_error_at(context, (_node)->span, __VA_ARGS__)
 #define RETURN_SEMA_ERROR(_node, ...) do { sema_error_at(context, (_node)->span, __VA_ARGS__); return false; } while (0)
+#define RETURN_SEMA_ERROR_AT(span__, ...) do { sema_error_at(context, span__, __VA_ARGS__); return false; } while (0)
 #ifdef NDEBUG
 #define ASSERT_SPANF(node__, check__, format__, ...) do { } while(0)
 #define ASSERT_SPAN(node__, check__) do { } while(0)
@@ -116,7 +117,8 @@ void cast_promote_vararg(SemaContext *context, Expr *arg);
 Type *cast_numeric_arithmetic_promotion(Type *type);
 void cast_to_int_to_max_bit_size(SemaContext *context, Expr *lhs, Expr *rhs, Type *left_type, Type *right_type);
 bool sema_decl_if_cond(SemaContext *context, Decl *decl);
-Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, const char *name, SourceSpan span, Expr **params);
+Decl *sema_analyse_parameterized_identifier(SemaContext *c, Path *decl_path, const char *name, SourceSpan span,
+                                            Expr **params, bool *was_recursive_ref);
 Type *sema_resolve_type_get_func(Signature *signature, CallABI abi);
 INLINE bool sema_set_abi_alignment(SemaContext *context, Type *type, AlignSize *result);
 INLINE bool sema_set_alloca_alignment(SemaContext *context, Type *type, AlignSize *result);
@@ -206,4 +208,38 @@ static inline IndexDiff range_const_len(Range *range)
 	if (range->start_from_end && range->end_from_end) return start_val - end_val + 1;
 	if (range->start_from_end != range->end_from_end) return -1;
 	return end_val - start_val + 1;
+}
+
+static inline StorageType sema_resolve_storage_type(SemaContext *context, Type *type)
+{
+	if (!type) return STORAGE_NORMAL;
+	bool is_distinct = false;
+	RETRY:
+	if (type == type_wildcard_optional) return STORAGE_WILDCARD;
+	switch (type->type_kind)
+	{
+		case TYPE_VOID:
+			return is_distinct ? STORAGE_UNKNOWN : STORAGE_VOID;
+		case TYPE_WILDCARD:
+			return STORAGE_WILDCARD;
+		case TYPE_MEMBER:
+		case TYPE_UNTYPED_LIST:
+		case TYPE_TYPEINFO:
+		case TYPE_FUNC_RAW:
+			return STORAGE_COMPILE_TIME;
+		case TYPE_OPTIONAL:
+			type = type->optional;
+			goto RETRY;
+		case TYPE_TYPEDEF:
+			if (!sema_analyse_decl(context, type->decl)) return false;
+			type = type->canonical;
+			goto RETRY;
+		case TYPE_DISTINCT:
+			is_distinct = true;
+			if (!sema_analyse_decl(context, type->decl)) return false;
+			type = type->decl->distinct->type;
+			goto RETRY;
+		default:
+			return STORAGE_NORMAL;
+	}
 }

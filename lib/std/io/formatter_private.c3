@@ -119,14 +119,14 @@ fn FloatType! float_from_any(any arg) @private
 }
 
 
-/**
- * Read a simple integer value, typically for formatting.
- *
- * @param [inout] len_ptr "the length remaining."
- * @param [in] buf "the buf to read from."
- * @param maxlen "the maximum len that can be read."
- * @return "The result of the atoi."
- **/
+<*
+ Read a simple integer value, typically for formatting.
+
+ @param [inout] len_ptr "the length remaining."
+ @param [in] buf "the buf to read from."
+ @param maxlen "the maximum len that can be read."
+ @return "The result of the atoi."
+*>
 fn uint simple_atoi(char* buf, usz maxlen, usz* len_ptr) @inline @private
 {
 	uint i = 0;
@@ -642,7 +642,7 @@ fn usz! Formatter.out_reverse(&self, char[] buf) @private
 	// pad spaces up to given width
 	if (!self.flags.zeropad && !self.flags.left)
 	{
-    	n += self.pad(' ', self.width, len)!;
+		n += self.pad(' ', self.width, len)!;
 	}
 	// reverse string
 	while (len) n += self.out(buf[--len])!;
@@ -661,7 +661,7 @@ fn int! printf_parse_format_field(
 	if (c.is_digit()) return simple_atoi(format_ptr, format_len, index_ptr);
 	if (c != '*') return 0;
 	usz len = ++(*index_ptr);
-    if (len >= format_len) return FormattingFault.BAD_FORMAT?;
+	if (len >= format_len) return FormattingFault.BAD_FORMAT?;
 	if (*args_index_ptr >= args_len) return FormattingFault.BAD_FORMAT?;
 	any val = args_ptr[(*args_index_ptr)++];
 	if (!val.type.kindof.is_int()) return FormattingFault.BAD_FORMAT?;

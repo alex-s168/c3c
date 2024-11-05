@@ -96,6 +96,13 @@ enum MkdirPermissions
 	USER_AND_ADMIN
 }
 
+<*
+ Create a directory on a given path, optionally recursive.
+
+ @param path `The path to create`
+ @param recursive `If directories in between should be created if they're missing, defaults to false`
+ @param permissions `The permissions to set on the directory`
+*>
 fn bool! mkdir(Path path, bool recursive = false, MkdirPermissions permissions = NORMAL)
 {
 	if (!path.path_string.len) return PathResult.INVALID_PATH?;
@@ -111,12 +118,22 @@ fn bool! mkdir(Path path, bool recursive = false, MkdirPermissions permissions =
 	return os::native_mkdir(path, permissions);
 }
 
+<*
+ Tries to delete directory, which must be empty.
+
+ @param path `The path to delete`
+ @return `true if there was a directory to delete, false otherwise`
+ @return! PathResult.INVALID_PATH `if the path was invalid`
+*>
 fn bool! rmdir(Path path)
 {
 	if (!path.path_string.len) return PathResult.INVALID_PATH?;
 	return os::native_rmdir(path);
 }
 
+<*
+ Like [rmdir] but deletes a directory even if it contains items.
+*>
 fn void! rmtree(Path path)
 {
 	if (!path.path_string.len) return PathResult.INVALID_PATH?;
@@ -127,11 +144,21 @@ fn void! rmtree(Path path)
 	$endif
 }
 
+<*
+ Creates a new path.
+
+ @return! PathResult.INVALID_PATH `if the path was invalid`
+*>
 fn Path! new(String path, Allocator allocator = allocator::heap(), PathEnv path_env = DEFAULT_PATH_ENV)
 {
 	return { normalize(path.copy(allocator), path_env), path_env };
 }
 
+<*
+ Creates a new path using the temp allocator.
+
+ @return! PathResult.INVALID_PATH `if the path was invalid`
+*>
 fn Path! temp_new(String path, PathEnv path_env = DEFAULT_PATH_ENV)
 {
 	return new(path, allocator::temp(), path_env);
@@ -165,11 +192,11 @@ fn Path! Path.append(self, String filename, Allocator allocator = allocator::hea
 	return self.new_append(filename, allocator) @inline;
 }
 
-/**
- * Append the string to the current path.
- *
- * @param [in] filename
- **/
+<*
+ Append the string to the current path.
+
+ @param [in] filename
+*>
 fn Path! Path.new_append(self, String filename, Allocator allocator = allocator::heap())
 {
 	if (!self.path_string.len) return new(filename, allocator, self.env)!;
@@ -226,9 +253,9 @@ fn Path! Path.absolute(self, Allocator allocator = allocator::heap()) @deprecate
 	return self.new_absolute(allocator) @inline;
 }
 
-/**
- * @require self.env == DEFAULT_PATH_ENV : "This method is only available on native paths"
- **/
+<*
+ @require self.env == DEFAULT_PATH_ENV : "This method is only available on native paths"
+*>
 fn Path! Path.new_absolute(self, Allocator allocator = allocator::heap())
 {
 	String path_str = self.str_view();
@@ -283,14 +310,14 @@ fn String Path.dirname(self)
 	return path_str[:basename_start - 1];
 }
 
-/**
- * Test if the path has the given extension, so given the path /foo/bar.c3
- * this would be true matching the extension "c3"
- *
- * @param [in] extension `The extension name (not including the leading '.')`
- * @require extension.len > 0 : `The extension cannot be empty`
- * @return `true if the extension matches`
- **/
+<*
+ Test if the path has the given extension, so given the path /foo/bar.c3
+ this would be true matching the extension "c3"
+
+ @param [in] extension `The extension name (not including the leading '.')`
+ @require extension.len > 0 : `The extension cannot be empty`
+ @return `true if the extension matches`
+*>
 fn bool Path.has_extension(self, String extension)
 {
 	String basename = self.basename();
@@ -352,6 +379,13 @@ fn usz! volume_name_len(String path, PathEnv path_env) @local
 	}
 }
 
+<*
+ Get the path of the parent. This does not allocate, but returns a slice
+ of the path itself.
+
+ @return `The parent of the path as a non-allocated path`
+ @return! PathResult.NO_PARENT `if this path does not have a parent`
+*>
 fn Path! Path.parent(self)
 {
 	if (self.path_string.len == 1 && is_separator(self.path_string[0], self.env)) return PathResult.NO_PARENT?;
@@ -509,11 +543,11 @@ fn String Path.root_directory(self)
 
 def PathWalker = fn bool! (Path, bool is_dir, void*);
 
-/*
- * Walk the path recursively. PathWalker is run on every file and
- * directory found. Return true to abort the walk.
- * @require self.env == DEFAULT_PATH_ENV : "This method is only available on native paths"
- */
+<*
+ Walk the path recursively. PathWalker is run on every file and
+ directory found. Return true to abort the walk.
+ @require self.env == DEFAULT_PATH_ENV : "This method is only available on native paths"
+*>
 fn bool! Path.walk(self, PathWalker w, void* data)
 {
 	const PATH_MAX = 512;

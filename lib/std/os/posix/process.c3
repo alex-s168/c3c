@@ -61,7 +61,7 @@ def BacktraceFn = fn CInt(void** buffer, CInt size);
 fn CInt backtrace(void** buffer, CInt size)
 {
 	if (size < 1) return 0;
-	void* handle = libc::dlopen("libc.so.6", libc::RTLD_LAZY);
+	void* handle = libc::dlopen("libc.so.6", libc::RTLD_LAZY|libc::RTLD_NODELETE);
 	if (handle)
 	{
 		BacktraceFn backtrace_fn = libc::dlsym(handle, "backtrace");
@@ -77,16 +77,16 @@ fn CInt backtrace(void** buffer, CInt size)
 		libc::longjmp(&backtrace_jmpbuf, 1);
 	};
 	SignalFunction sig_bus = libc::signal(libc::SIGBUS, restore_backtrace);
-    SignalFunction sig_segv = libc::signal(libc::SIGSEGV, restore_backtrace);
-    SignalFunction sig_ill = libc::signal(libc::SIGILL, restore_backtrace);
+	SignalFunction sig_segv = libc::signal(libc::SIGSEGV, restore_backtrace);
+	SignalFunction sig_ill = libc::signal(libc::SIGILL, restore_backtrace);
 
 	void*[128] buffer_first;
 	int i = 0;
-    for (i = 0; i < size; i++)
-    {
+	for (i = 0; i < size; i++)
+	{
 		if (libc::setjmp(&backtrace_jmpbuf) == 1) break;
-        buffer[i] = builtin::get_returnaddress(i);
-        if (!buffer[i]) break;
+		buffer[i] = builtin::get_returnaddress(i);
+		if (!buffer[i]) break;
 	}
 	libc::signal(libc::SIGBUS, sig_bus);
 	libc::signal(libc::SIGSEGV, sig_segv);
