@@ -156,11 +156,9 @@ vx_IrType* vxcc_type(Type* type)
         }
 
         default: {
-            error_exit("VXCC currently doesn't support %s type (typekind%i)", type->name, type->type_kind);
+            error_exit("VXCC currently doesn't support %s type (typekind %i)", type->name, type->type_kind);
         }
     }
-
-    printf("type %s has size of %zu\n", type->name, vx_IrType_size(res));
 
     return res;
 }
@@ -215,7 +213,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
 
     // no need for implicit return because we are already at tail and the return var is initialized with undefined
 
-    vx_CIrBlock_fix(block);
+    vx_CIrBlock_fix(cu->cu, block);
 
     return block;
 }
@@ -226,6 +224,7 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
     assert(vxcu);
     memset(vxcu, 0, sizeof(VxccCU));
 
+	vxcu->cu = vx_cu;
     vxcu->nextVarId = 1; // see vxcc_codegen_internal.h for why this is 1
 
     cu->vxcc = vxcu;
@@ -241,6 +240,7 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
         {
             vx_IrBlock* block = vxcc_emit_function_body(vxcu, decl);
             vx_CU_addIrBlock(vx_cu, block, decl->is_export);
+			printf("export(%i) %s\n", decl->is_export, block->name);
         }
     }
 
@@ -266,20 +266,8 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
     }
 }
 
-static void vxcc_set_opt_flags(void)
-{
-    // TODO:opt flags  
-
-    vx_g_optconfig.if_eval = true;
-    vx_g_optconfig.loop_simplify = true;
-    vx_g_optconfig.consteval_iterations = 6;
-    vx_g_optconfig.max_total_cmov_inline_cost = 4;
-}
-
 void **vxcc_gen(Module** modules, unsigned module_count)
 {
-    vxcc_set_opt_flags();
-
 	if (!module_count) return NULL;
     if (compiler.build.emit_object_files)
 	{
@@ -318,22 +306,11 @@ void **vxcc_gen(Module** modules, unsigned module_count)
     }
 }
 
-static void vxcc_set_target(vx_Target* dest) {
-    switch (compiler.platform.arch)
-    {
-        case ARCH_TYPE_X86_64:
-            dest->arch = VX_TARGET_X86_64;
-            break;
-
-        default:
-            error_exit("architecture not supported by vxcc");
-    }
-}
-
 const char *vxcc_codegen(void *context)
 {
 	vx_CU* cu = context;
-    vxcc_set_target(&cu->target);
+	vx_CU_init(cu, "amd64:cmov");
+	printf("target arch %i\n", cu->target.arch);
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = stdout;  //       ^^^^
