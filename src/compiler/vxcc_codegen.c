@@ -273,11 +273,11 @@ void **vxcc_gen(Module** modules, unsigned module_count)
 	{
         if (compiler.build.benchmarking)
 		{
-            error_exit("vxcc backend currly does not support benchmarks");
+            error_exit("vxcc backend currently does not support benchmarks");
 		}
 		if (compiler.build.testing)
 		{
-            error_exit("vxcc backend currly does not support tests");
+            error_exit("vxcc backend currently does not support tests");
 		}
 
         vx_CU** cus = NULL;
@@ -288,7 +288,7 @@ void **vxcc_gen(Module** modules, unsigned module_count)
             FOREACH(CompilationUnit *, unit, module->units)
             {
                 vx_CU* cu = fastalloc(sizeof(vx_CU));
-                memset(cu, 0, sizeof(vx_CU));
+				vx_CU_init(cu, "amd64:cmov");
                 vec_add(cus, cu);
                 vxcc_gen_cu(module, unit, cu);
             }
@@ -309,8 +309,8 @@ void **vxcc_gen(Module** modules, unsigned module_count)
 const char *vxcc_codegen(void *context)
 {
 	vx_CU* cu = context;
-	vx_CU_init(cu, "amd64:cmov");
 	printf("target arch %i\n", cu->target.arch);
+	printf("cu has %zu blocks\n", cu->blocks_len);
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = stdout;  //       ^^^^

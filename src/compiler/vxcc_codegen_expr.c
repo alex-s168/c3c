@@ -573,7 +573,7 @@ vx_IrVar vxcc_emit_constinit(vx_IrBlock* dest_block, VxccCU* cu, ConstInitialize
         // emits: T var; memset(&var, 0, sizeof(var));
         case CONST_INIT_ZERO: {
             vx_IrType* ty = vxcc_type(init->type);
-            vx_IrTypeRef ptrTy = vx_ptrType(dest_block);
+            vx_IrType* ptrTy = cu->cu->info.get_ptr_ty(cu->cu, dest_block);
 
             vx_IrVar out = cu->nextVarId ++; {
                 vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
@@ -585,16 +585,18 @@ vx_IrVar vxcc_emit_constinit(vx_IrBlock* dest_block, VxccCU* cu, ConstInitialize
             vx_IrVar ptr = cu->nextVarId ++; {
                 vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                 vx_IrOp_init(op, VX_IR_OP_PLACE, dest_block);
-                vx_IrOp_addOut(op, ptr, ptrTy.ptr);
+                vx_IrOp_addOut(op, ptr, ptrTy);
                 vx_IrOp_addParam_s(op, VX_IR_NAME_VAR, VX_IR_VALUE_VAR(out));
             }
 
-            {
+            // TODO: MEMSET
+			assert(false);
+			/*{
                 vx_IrOp* op = vx_IrBlock_addOpBuilding(dest_block);
                 vx_IrOp_init(op, VX_IR_OP_MEMSET, dest_block);
                 vx_IrOp_addParam_s(op, VX_IR_NAME_ADDR, VX_IR_VALUE_VAR(ptr));
                 vx_IrOp_addParam_s(op, VX_IR_NAME_SIZE, VX_IR_VALUE_IMM_INT(type_size(init->type)));
-            }
+            }*/
 
             return out;
         }
