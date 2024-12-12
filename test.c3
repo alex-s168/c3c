@@ -59,10 +59,10 @@ fn int assignments(int y) @export
     return (int) x;
 }
 
-fn int sum(int* arr, int len) @export 
+fn int sum(int* arr, usz len) @export 
 {
     int sum = 0;
-    for (int i = 0; i < len; i ++)
+    for (usz i = 0; i < len; i ++)
     {
         sum += arr[i];
     }
@@ -93,6 +93,11 @@ fn void colwise_reduce_sum(int* dest, int* a, usz w, usz h) @export
 fn usz test(int a, int b) @export 
 {
     return ((usz) (&a)) + b;
+}
+
+fn int cmp(int a, int b) @export 
+{
+	return (int) (a > 20 && a < b);
 }
 
 /*

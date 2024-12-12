@@ -169,6 +169,8 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     FuncDecl* fn = &decl->func_decl;
     assert(fn != NULL);
 
+	FunctionPrototype* proto = type_get_resolved_prototype(decl->type);
+
     vx_IrBlock* block = fastalloc(sizeof(vx_IrBlock));
     assert(block != NULL);
     vx_IrBlock_init(block, NULL, NULL); // root block 
@@ -176,7 +178,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     block->name = decl->name;
 
     
-    Type* retTy = typeget(fn->signature.rtype);
+    Type* retTy = proto->abi_ret_type;
     if (retTy && retTy->type_kind == TYPE_VOID)
     {
         retTy = NULL;
@@ -240,7 +242,6 @@ static void vxcc_gen_cu(Module* parent, CompilationUnit* cu, vx_CU* vx_cu)
         {
             vx_IrBlock* block = vxcc_emit_function_body(vxcu, decl);
             vx_CU_addIrBlock(vx_cu, block, decl->is_export);
-			printf("export(%i) %s\n", decl->is_export, block->name);
         }
     }
 
@@ -309,8 +310,6 @@ void **vxcc_gen(Module** modules, unsigned module_count)
 const char *vxcc_codegen(void *context)
 {
 	vx_CU* cu = context;
-	printf("target arch %i\n", cu->target.arch);
-	printf("cu has %zu blocks\n", cu->blocks_len);
 
     FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
     FILE* optionalOptimizedLlIr = stdout;  //       ^^^^
