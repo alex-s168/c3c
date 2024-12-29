@@ -411,7 +411,6 @@ static void vxcc_emit_cast(vx_IrBlock* dest_block, VxccCU* cu, vx_IrVar dest, Ty
         case CAST_STRPTR:
         case CAST_STINLINE:
         case CAST_VECARR:
-        case CAST_INTERR:
         case CAST_EXPVEC: {
             error_exit("cast kind %i currenlty not supported by VXCC backend", kind);
             break;

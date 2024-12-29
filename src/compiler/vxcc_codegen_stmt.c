@@ -51,7 +51,8 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
         }
 
         case AST_ASM_STMT:
-        case AST_ASM_BLOCK_STMT: {
+	case AST_ASM_LABEL:
+	case AST_ASM_BLOCK_STMT: {
             error_exit("inline ASM currently not supported by VXCC backend");
             break;
         }

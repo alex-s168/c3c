@@ -346,11 +346,11 @@ static void c_emit_const_expr(GenContext *c, CValue *value, Expr *expr)
 			}
 			if (type_is_unsigned(t))
 			{
-				PRINTF("%s ___var_%d = %llu;\n", c_type_name(c, t), c_emit_temp(c, value, t), expr->const_expr.ixx.i.low);
+				PRINTF("%s ___var_%d = %llu;\n", c_type_name(c, t), c_emit_temp(c, value, t), (long long unsigned int) expr->const_expr.ixx.i.low);
 			}
 			else
 			{
-				PRINTF("%s ___var_%d = %lld;\n", c_type_name(c, t), c_emit_temp(c, value, t), expr->const_expr.ixx.i.low);
+				PRINTF("%s ___var_%d = %lld;\n", c_type_name(c, t), c_emit_temp(c, value, t), (long long unsigned int) expr->const_expr.ixx.i.low);
 			}
 			return;
 		case CONST_BOOL:
