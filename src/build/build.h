@@ -17,9 +17,10 @@
 
 typedef enum
 {
-	BACKEND_LLVM = 1,
-	BACKEND_TB = 2,
-    BACKEND_VXCC = 3,
+	BACKEND_LLVM = 0,
+	BACKEND_TB = 1,
+	BACKEND_C = 2,
+	BACKEND_VXCC = 3,
 } CompilerBackend;
 
 typedef enum
@@ -29,7 +30,6 @@ typedef enum
 	COMMAND_COMPILE_ONLY,
 	COMMAND_COMPILE_BENCHMARK,
 	COMMAND_COMPILE_TEST,
-	COMMAND_GENERATE_HEADERS,
 	COMMAND_INIT,
 	COMMAND_INIT_LIB,
 	COMMAND_BUILD,
@@ -417,6 +417,7 @@ typedef struct BuildOptions_
 	{
 		const char *sdk;
 		const char *def;
+		const char *vs_dirs;
 		WinCrtLinking crt_linking;
 	} win;
 	struct
@@ -454,6 +455,7 @@ typedef struct BuildOptions_
 		ProjectSubcommand command;
 		const char *target_name;
 		TargetType target_type;
+		const char **sources;
 	} project_options;
 	CompileOption compile_option;
 	TrustLevel trust_level;
@@ -480,6 +482,7 @@ typedef struct BuildOptions_
 	bool print_output;
 	bool print_input;
 	bool run_once;
+	int verbosity_level;
 	const char *panicfn;
 	const char *benchfn;
 	const char *testfn;
@@ -524,6 +527,7 @@ typedef struct
 	const char *cc;
 	const char *cflags;
 	WinCrtLinking win_crt;
+	const char **source_dirs;
 	const char **csource_dirs;
 	const char **csources;
 	const char **cinclude_dirs;
@@ -541,6 +545,7 @@ typedef struct Library__
 	const char **execs;
 	const char *cc;
 	const char *cflags;
+	const char **source_dirs;
 	const char **csource_dirs;
 	const char **cinclude_dirs;
 	WinCrtLinking win_crt;
@@ -554,6 +559,7 @@ typedef struct
 	Library **library_list;
 	LibraryTarget **ccompiling_libraries;
 	const char *name;
+	const char *output_name;
 	const char *version;
 	const char *langrev;
 	const char **source_dirs;
@@ -588,6 +594,7 @@ typedef struct
 	bool emit_object_files;
 	bool benchmarking;
 	bool testing;
+	bool silent;
 	bool read_stdin;
 	bool print_output;
 	bool print_input;
@@ -595,6 +602,7 @@ typedef struct
 	bool no_entry;
 	bool kernel_build;
 	bool silence_deprecation;
+	bool print_stats;
 	int build_threads;
 	TrustLevel trust_level;
 	OptimizationSetting optsetting;
@@ -658,6 +666,7 @@ typedef struct
 	{
 		const char *sdk;
 		const char *def;
+		const char *vs_dirs;
 		WinCrtLinking crt_linking;
 		bool use_win_subsystem;
 	} win;

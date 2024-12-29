@@ -124,7 +124,7 @@ void context_pop_defers_and_replace_ast(SemaContext *context, Ast *ast)
 	AstId defer_first = 0;
 	context_pop_defers(context, &defer_first);
 	if (!defer_first) return;
-	assert(ast->ast_kind != AST_COMPOUND_STMT);
+	ASSERT0(ast->ast_kind != AST_COMPOUND_STMT);
 	Ast *replacement = ast_copy(ast);
 	ast->ast_kind = AST_COMPOUND_STMT;
 	ast->compound_stmt = (AstCompoundStmt) { .first_stmt = astid(replacement) };
@@ -208,15 +208,16 @@ static void register_generic_decls(CompilationUnit *unit, Decl **decls)
 		decl->unit = unit;
 		switch (decl->decl_kind)
 		{
-			case DECL_POISONED:
 			case DECL_ENUM_CONSTANT:
 			case DECL_FAULTVALUE:
-			case DECL_IMPORT:
-			case DECL_LABEL:
-			case DECL_CT_ASSERT:
-			case DECL_CT_ECHO:
 			case DECL_DECLARRAY:
 			case DECL_ERASED:
+			case DECL_LABEL:
+				UNREACHABLE
+			case DECL_POISONED:
+			case DECL_IMPORT:
+			case DECL_CT_ASSERT:
+			case DECL_CT_ECHO:
 			case DECL_FNTYPE:
 			case DECL_CT_INCLUDE:
 			case DECL_CT_EXEC:
@@ -252,7 +253,7 @@ static void register_generic_decls(CompilationUnit *unit, Decl **decls)
 
 static void analyze_generic_module(Module *module)
 {
-	assert(module->parameters && module->is_generic);
+	ASSERT0(module->parameters && module->is_generic);
 	FOREACH(CompilationUnit *, unit, module->units)
 	{
 		register_generic_decls(unit, unit->global_decls);

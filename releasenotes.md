@@ -1,5 +1,94 @@
 # C3C Release Notes
 
+## 0.6.6 Change list
+
+### Changes / improvements
+- Split help into normal and "full" help, #1703
+- Removed 'headers' command line option.
+- Add `enum.from_ordinal` and `fault.from_ordinal`
+- Deprecate cast-style conversion from integer <-> enum.
+- Make deprecation an error in test mode.
+- Add `--win-vs-dirs` to override VS detection dirs.
+- Add `"name"` project property to override the name of the resulting binary. #1719
+- Improved `add-project` to take arguments.
+
+### Fixes
+- Fix case trying to initialize a `char[*]*` from a String.
+- Fix Map & HashMap `put_all_for_create` not copying all elements, causing `init_from_map` to create incomplete copy.
+- Fix bug when a macro calling an extern function was called in another module also declaring and calling the same function. #1690
+- `static-lib` and `dynamic-lib` options from the command line now produces headers.
+- Fix bug outputting exported functions without predefined extname.
+- Fix problem where crt1 was linked for dynamic libraries on Linux and BSD. #1710
+- Fix CRT detection on Arch Linux.
+- Fix lexer allowing a trailing underscore (_) with hex and binary literals.
+- Fix `--list-operators` CLI command printing underscore (_) and hash (#).
+- Fix bug in temp allocator when temp memory is exhausted and allocation needs overaligned mem. #1715
+- Incorrectly handles distinct enums and pointers with '+=' and '-=' #1717.
+- Prevent DString from being initialized with "".
+- Fix bug in OnStackAllocator when freeing overallocated data. #1720
+- Use `weak_odr` rather than `weak` on Windows which seems to prevent issues such as #1704.
+- Use `weak` on dyn-symbols on Linux.
+- Fix crash on project.json not having an empty set of targets.
+
+### Stdlib changes
+- Increase BitWriter.write_bits limit up to 32 bits.
+- Updates to `Slice2d`, like `get_xy` and others.
+- Added `iter()` `value_iter()` and `key_iter()` to HashMap.
+- Add "tokenizer" to String.
+- Add "skip_empty" to split methods. Add split_to_buffer method.
+- Add `@enum_from_value`.
+
+## 0.6.5 Change list
+
+### Changes / improvements
+- Allow splat in initializers.
+- Init command will now add `test-sources` to `project.json` #1520
+- `a++` may be discarded if `a` is optional and ++/-- works for overloaded operators.
+- Improve support for Windows cross compilation on targets with case sensitive file systems.
+- Add "sources" support to library `manifest.json`, defaults to root folder if unspecified.
+- Add char_at method in DString and operators [], len, []= and &[].
+- Add `-q` option, make `--run-once` implicitly `-q`.
+- Add `-v`, `-vv` and `-vvv` options for increasing verbosity, replacing debug-log and debug-stats options.
+
+### Fixes
+- Fix bug where `a > 0 ? f() : g()` could cause a compiler crash if both returned `void!`.
+- `@builtin` was not respected for generic modules #1617.
+- Fix issue writing a single byte in the WriteBuffer
+- A distinct inline pointer type can now participate in pointer arithmetics.
+- Support &a[0] returning the distinct type when applying it to a distinct of a pointer.
+- Fix error when calling `HashMap.remove` on uninitialized `HashMap`.
+- Fix issue with resolved try-unwrap in defer.
+- Fix issue with overloaded subscript and ++/-- and assign ops (e.g. `*=`)
+- Fix issue with properties in different targets not being respected #1633.
+- Indexing an Optional slice would crash in codegen #1636.
+- SimpleHeapAllocator bug when splitting blocks allowed memory overrun.
+- Not possible to alias or take reference for extension methods on non-user defined types. #1637
+- Prevent methods from using names of properties or fields. #1638
+- b64 / hex data strings can now be used with \` as well.
+- Contracts on generic modules would evaluate too late, sometimes not catching the error until it already occurred elsewhere.
+- Fix bug preventing optionals from being used in ranges or as indices.
+- Crash compiling for arm64 when returning 16 byte and smaller structs by value not a power of 2 #1649.
+- Enforce single module compilation for static libraries to make constructors run properly.
+- Crash when using --no-obj without compile-only. #1653
+- Do not produce expression locations for windows.
+- Issue where multiple methods were accepted for the same type.
+- Issue where a method was linked to a type alias instead of the underlying type.
+- Fix Fnv1a encoding.
+- Fix issue with accessing arrays in access-overloaded types, e.g. `list[1][2]` #1665.
+- Cast removing arbitrary array indices and converting them to pointers should always be fine #1664
+- Incorrect "no-libc" definition of `cos`, making it unavailable for wasm.
+- Fix issue with the adjoint and inverse calculations for `Matrix2x2`.
+- It was possible to create 0 length arrays using byte literals. #1678
+- Crash when a constant null typeid is checked for properties. #1679
+
+### Stdlib changes
+- Add `io::MultiReader`, `io::MultiWriter`, and `io::TeeReader` structs.
+- Updated Base32 API.
+- Add `file::save`.
+- Add `memcpy` / `memset` / `memcmp` to nolibc.
+- Add `sort::quickselect` to find the k-th smallest element in an unordered list.
+- Add `sort::is_sorted` to determine if a list is sorted.
+
 ## 0.6.4 Change list
 
 ### Changes / improvements

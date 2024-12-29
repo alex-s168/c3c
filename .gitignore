@@ -19,6 +19,7 @@
 
 # Libraries
 *.lib
+*.tlb
 *.a
 *.la
 *.lo
@@ -74,4 +75,7 @@ TAGS
 # Clangd LSP files
 /.cache/
 /compile_commands.json
+
+# 'nix build' resulting symlink
+result
 

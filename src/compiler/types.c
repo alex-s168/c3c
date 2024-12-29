@@ -94,7 +94,7 @@ Type *type_int_unsigned_by_bitsize(BitSize bit_size)
 		case 32: return type_uint;
 		case 64: return type_ulong;
 		case 128: return type_u128;
-		default: FATAL_ERROR("Illegal bitsize %d", bit_size);
+		default: FATAL_ERROR("Illegal bitsize");
 	}
 }
 
@@ -303,7 +303,7 @@ const char *type_to_error_string(Type *type)
 
 bool type_is_matching_int(CanonicalType *type1, CanonicalType *type2)
 {
-	assert(type1->canonical == type1 && type2->canonical == type2);
+	ASSERT0(type1->canonical == type1 && type2->canonical == type2);
 	TypeKind typekind1 = type1->type_kind;
 	TypeKind typekind2 = type2->type_kind;
 	if (typekind1 == typekind2) return type_kind_is_any_integer(typekind1);
@@ -318,11 +318,11 @@ RETRY:
 	switch (type->type_kind)
 	{
 		case TYPE_BITSTRUCT:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			type = type->decl->strukt.container_type->type;
 			goto RETRY;
 		case TYPE_DISTINCT:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			type = type->decl->distinct->type;
 			goto RETRY;
 		case TYPE_VECTOR:
@@ -346,12 +346,12 @@ RETRY:
 			type = type_iptr->canonical;
 			goto RETRY;
 		case TYPE_ENUM:
-			assert(type->decl->enums.type_info->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->enums.type_info->resolve_status == RESOLVE_DONE);
 			type = type->decl->enums.type_info->type->canonical;
 			goto RETRY;
 		case TYPE_STRUCT:
 		case TYPE_UNION:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			return type->decl->strukt.size;
 		case TYPE_VOID:
 			return 1;
@@ -377,7 +377,7 @@ RETRY:
 
 FunctionPrototype *type_get_resolved_prototype(Type *type)
 {
-	assert(type->type_kind == TYPE_FUNC_RAW);
+	ASSERT0(type->type_kind == TYPE_FUNC_RAW);
 	FunctionPrototype *prototype = type->function.prototype;
 	if (!prototype->is_resolved) c_abi_func_create(prototype);
 	return prototype;
@@ -466,7 +466,7 @@ bool type_is_abi_aggregate(Type *type)
 
 Type *type_find_largest_union_element(Type *type)
 {
-	assert(type->type_kind == TYPE_UNION);
+	ASSERT0(type->type_kind == TYPE_UNION);
 	ByteSize largest = 0;
 	Type *largest_type = NULL;
 	FOREACH(Decl *, member, type->decl->strukt.members)
@@ -652,7 +652,7 @@ void type_mangle_introspect_name_to_buffer(Type *type)
 
 bool type_func_match(Type *fn_type, Type *rtype, unsigned arg_count, ...)
 {
-	assert(type_is_func_ptr(fn_type));
+	ASSERT0(type_is_func_ptr(fn_type));
 	Signature *sig = fn_type->pointer->function.signature;
 	if (rtype->canonical != typeget(sig->rtype)->canonical) return false;
 	if (vec_size(sig->params) != arg_count) return false;
@@ -715,7 +715,7 @@ AlignSize type_abi_alignment(Type *type)
 			goto RETRY;
 		case TYPE_STRUCT:
 		case TYPE_UNION:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			return type->decl->alignment;
 			UNREACHABLE
 		case TYPE_BOOL:
@@ -744,7 +744,7 @@ AlignSize type_abi_alignment(Type *type)
 
 static inline void create_type_cache(Type *type)
 {
-	assert(type->type_cache == NULL);
+	ASSERT0(type->type_cache == NULL);
 	for (int i = 0; i < ARRAY_OFFSET; i++)
 	{
 		vec_add(type->type_cache, NULL);
@@ -921,14 +921,14 @@ Type *type_get_ptr_recurse(Type *ptr_type)
 }
 Type *type_get_ptr(Type *ptr_type)
 {
-	assert(ptr_type->type_kind != TYPE_FUNC_RAW);
-	assert(!type_is_optional(ptr_type));
+	ASSERT0(ptr_type->type_kind != TYPE_FUNC_RAW);
+	ASSERT0(!type_is_optional(ptr_type));
 	return type_generate_ptr(ptr_type, false);
 }
 
 Type *type_get_func_ptr(Type *func_type)
 {
-	assert(func_type->type_kind == TYPE_FUNC_RAW);
+	ASSERT0(func_type->type_kind == TYPE_FUNC_RAW);
 	if (func_type->func_ptr) return func_type->func_ptr;
 	Type *type = func_type->func_ptr = type_new(TYPE_FUNC_PTR, func_type->name);
 	type->pointer = func_type;
@@ -938,38 +938,38 @@ Type *type_get_func_ptr(Type *func_type)
 
 Type *type_get_optional(Type *optional_type)
 {
-	assert(!type_is_optional(optional_type));
+	ASSERT0(!type_is_optional(optional_type));
 	return type_generate_optional(optional_type, false);
 }
 
 Type *type_get_slice(Type *arr_type)
 {
-	assert(type_is_valid_for_array(arr_type));
+	ASSERT0(type_is_valid_for_array(arr_type));
 	return type_generate_slice(arr_type, false);
 }
 
 Type *type_get_inferred_array(Type *arr_type)
 {
-	assert(type_is_valid_for_array(arr_type));
+	ASSERT0(type_is_valid_for_array(arr_type));
 	return type_generate_inferred_array(arr_type, false);
 }
 
 Type *type_get_inferred_vector(Type *arr_type)
 {
-	assert(type_is_valid_for_array(arr_type));
+	ASSERT0(type_is_valid_for_array(arr_type));
 	return type_generate_inferred_vector(arr_type, false);
 }
 
 Type *type_get_flexible_array(Type *arr_type)
 {
-	assert(type_is_valid_for_array(arr_type));
+	ASSERT0(type_is_valid_for_array(arr_type));
 	return type_generate_flexible_array(arr_type, false);
 }
 
 
 static inline bool array_structurally_equivalent_to_struct(Type *array, Type *type)
 {
-	assert(array->type_kind == TYPE_ARRAY);
+	ASSERT0(array->type_kind == TYPE_ARRAY);
 
 	ArrayIndex len = (ArrayIndex)array->array.len;
 	if (!len) return type_size(type) == 0;
@@ -978,7 +978,7 @@ static inline bool array_structurally_equivalent_to_struct(Type *array, Type *ty
 
 	if (len == 1 && type_is_structurally_equivalent(base, type)) return true;
 
-	assert(type->type_kind != TYPE_UNION && "Does not work on unions");
+	ASSERT0(type->type_kind != TYPE_UNION && "Does not work on unions");
 
 	if (!type_is_union_or_strukt(type)) return false;
 
@@ -1154,7 +1154,8 @@ static Type *type_create_array(Type *element_type, ArraySize len, bool vector, b
 
 Type *type_get_array(Type *arr_type, ArraySize len)
 {
-	assert(type_is_valid_for_array(arr_type));
+	ASSERT(len > 0, "Created a zero length array");
+	ASSERT0(type_is_valid_for_array(arr_type));
 	return type_create_array(arr_type, len, false, false);
 }
 
@@ -1173,7 +1174,7 @@ bool type_is_valid_for_vector(Type *type)
 		case TYPE_ANYFAULT:
 			return true;
 		case TYPE_DISTINCT:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			type = type->decl->distinct->type;
 			goto RETRY;
 		case TYPE_TYPEDEF:
@@ -1190,7 +1191,7 @@ bool type_is_valid_for_array(Type *type)
 	switch (type->type_kind)
 	{
 		case TYPE_DISTINCT:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			type = type->decl->distinct->type;
 			goto RETRY;
 		case TYPE_ANY:
@@ -1213,7 +1214,7 @@ bool type_is_valid_for_array(Type *type)
 		case TYPE_VECTOR:
 			return true;
 		case TYPE_TYPEDEF:
-			assert(type->decl->resolve_status == RESOLVE_DONE);
+			ASSERT0(type->decl->resolve_status == RESOLVE_DONE);
 			type = type->canonical;
 			goto RETRY;
 		case TYPE_FLEXIBLE_ARRAY:
@@ -1242,14 +1243,14 @@ Type *type_get_vector_bool(Type *original_type)
 
 Type *type_get_vector(Type *vector_type, unsigned len)
 {
-	assert(type_is_valid_for_vector(vector_type));
+	ASSERT0(type_is_valid_for_vector(vector_type));
 	return type_create_array(vector_type, len, true, false);
 }
 
 static void type_create(const char *name, Type *location, TypeKind kind, unsigned bitsize,
 						unsigned align, unsigned pref_align)
 {
-	assert(align);
+	ASSERT0(align);
 	unsigned byte_size = (bitsize + 7) / 8;
 	*location = (Type) {
 		.type_kind = kind,
@@ -1267,7 +1268,7 @@ static void type_create(const char *name, Type *location, TypeKind kind, unsigne
 
 static void type_init(const char *name, Type *location, TypeKind kind, unsigned bitsize, AlignData align)
 {
-	assert(align.align);
+	ASSERT0(align.align);
 	unsigned byte_size = (bitsize + 7) / 8;
 	*location = (Type) {
 		.type_kind = kind,
@@ -1488,7 +1489,7 @@ bool type_is_scalar(Type *type)
 
 Type *type_find_parent_type(Type *type)
 {
-	assert(type->canonical);
+	ASSERT0(type->canonical);
 	switch (type->type_kind)
 	{
 		case TYPE_DISTINCT:
@@ -1514,7 +1515,7 @@ Type *type_find_parent_type(Type *type)
  */
 bool type_is_subtype(Type *type, Type *possible_subtype)
 {
-	assert(type == type->canonical);
+	ASSERT0(type == type->canonical);
 	while (possible_subtype)
 	{
 		possible_subtype = possible_subtype->canonical;
@@ -1587,7 +1588,7 @@ static TypeCmpResult type_array_is_equivalent(SemaContext *context, Type *from, 
 	switch (from->type_kind)
 	{
 		case TYPE_INFERRED_ARRAY:
-			assert(to_kind != TYPE_INFERRED_ARRAY);
+			ASSERT0(to_kind != TYPE_INFERRED_ARRAY);
 			if (to_kind != TYPE_ARRAY) return TYPE_MISMATCH;
 			return type_array_element_is_equivalent(context, from->array.base, to->array.base, is_explicit);
 		case TYPE_ARRAY:
@@ -1595,7 +1596,7 @@ static TypeCmpResult type_array_is_equivalent(SemaContext *context, Type *from, 
 			if (to->type_kind == TYPE_ARRAY && from->array.len != to->array.len) return TYPE_MISMATCH;
 			return type_array_element_is_equivalent(context, from->array.base, to->array.base, is_explicit);
 		case TYPE_INFERRED_VECTOR:
-			assert(to_kind != TYPE_INFERRED_VECTOR);
+			ASSERT0(to_kind != TYPE_INFERRED_VECTOR);
 			if (to->type_kind != TYPE_VECTOR) return TYPE_MISMATCH;
 			return type_array_element_is_equivalent(context, from->array.base, to->array.base, is_explicit);
 		case TYPE_VECTOR:
@@ -1627,8 +1628,14 @@ TypeCmpResult type_array_element_is_equivalent(SemaContext *context, Type *eleme
 	}
 	switch (element1->type_kind)
 	{
+		case TYPE_FUNC_PTR:
+			if (element2 == type_voidptr) return TYPE_SAME;
+			if (element1->type_kind != TYPE_FUNC_PTR) return TYPE_MISMATCH;
+			if (element1->pointer->function.prototype->raw_type == element2->pointer->function.prototype->raw_type) return TYPE_SAME;
+			return TYPE_MISMATCH;
 		case TYPE_POINTER:
-			if (element2->type_kind != TYPE_POINTER) return TYPE_MISMATCH;
+			if (element2->type_kind == TYPE_FUNC_PTR && type_voidptr == element1) return TYPE_SAME;
+			if (!type_is_pointer(element2)) return TYPE_MISMATCH;
 			return type_is_pointer_equivalent(context, element1, element2, is_explicit);
 		case TYPE_STRUCT:
 			if (is_explicit) return type_is_structurally_equivalent(element1, element2) ? TYPE_SAME : TYPE_MISMATCH;
@@ -1673,27 +1680,29 @@ RETRY:
 	if (to_pointee == from_pointee) return TYPE_SAME;
 	if (type_is_subtype(to_pointee, from_pointee)) return TYPE_SAME;
 
-	if (to_pointee->type_kind != from_pointee->type_kind)
+	if (type_is_matching_int(to_pointee, from_pointee)) return TYPE_SAME_INT_SIZE;
+
+	if (type_is_any_arraylike(from_pointee))
 	{
 		TypeCmpResult res_current = TYPE_SAME;
 		if (type_abi_alignment(to_pointee) > type_abi_alignment(from_pointee)) res_current = TYPE_ALIGNMENT_INCREASE;
-		if (type_is_matching_int(to_pointee, from_pointee)) return TYPE_SAME_INT_SIZE;
 
-		if (type_is_any_arraylike(from_pointee))
+		// Try array equivalence.
+		if (type_is_any_arraylike(to_pointee))
 		{
-			// Try array equivalence.
-			if (type_is_any_arraylike(to_pointee))
+			TypeCmpResult res = type_array_is_equivalent(context, from_pointee, to_pointee, flatten_distinct);
+			if (res != TYPE_MISMATCH) return res == TYPE_SAME ? res_current : res;
+			if (to_pointee->array.len == from_pointee->array.len && to_pointee->array.base->canonical == from_pointee->array.base->canonical)
 			{
-				TypeCmpResult res = type_array_is_equivalent(context, to_pointee, from_pointee, flatten_distinct);
-				if (res != TYPE_MISMATCH) return res == TYPE_SAME ? res_current : res;
+				return res_current;
 			}
-			// A possible int[4]* -> int* decay?
-			TypeCmpResult res = type_is_pointer_equivalent(context, type_get_ptr(from_pointee->array.base), to_pointer, flatten_distinct);
-			return res == TYPE_SAME ? res_current : res;
 		}
-		// Not arraylike and no array decay. Failure.
-		return TYPE_MISMATCH;
+		// A possible int[4]* -> int* decay?
+		TypeCmpResult res = type_is_pointer_equivalent(context, to_pointer, type_get_ptr(from_pointee->array.base), flatten_distinct);
+		if (res == TYPE_SAME) return res_current;
 	}
+
+	if (to_pointee->type_kind != from_pointee->type_kind) return TYPE_MISMATCH;
 
 	if (to_pointee->type_kind == TYPE_FUNC_RAW && from_pointee->type_kind == TYPE_FUNC_RAW)
 	{
@@ -1775,8 +1784,8 @@ Type *type_find_max_num_type(Type *num_type, Type *other_num)
 {
 	TypeKind kind = num_type->type_kind;
 	TypeKind other_kind = other_num->type_kind;
-	assert(kind <= other_kind && "Expected ordering");
-	assert(kind != other_kind);
+	ASSERT0(kind <= other_kind && "Expected ordering");
+	ASSERT0(kind != other_kind);
 
 	// 1. The only conversions need to happen if the other type is a number.
 	if (other_kind < TYPE_INTEGER_FIRST || other_kind > TYPE_FLOAT_LAST) return NULL;
@@ -1799,7 +1808,7 @@ Type *type_find_max_num_type(Type *num_type, Type *other_num)
 	}
 
 	// Handle integer <=> integer conversions.
-	assert(type_kind_is_any_integer(other_kind) && type_is_integer(num_type));
+	ASSERT0(type_kind_is_any_integer(other_kind) && type_is_integer(num_type));
 
 	// 4. Check the bit sizes.
 	unsigned other_bit_size = other_num->builtin.bitsize;
@@ -1880,7 +1889,7 @@ static inline Type *type_find_max_ptr_type(Type *type, Type *other)
 
 Type *type_decay_array_pointer(Type *type)
 {
-	assert(type->type_kind == TYPE_POINTER);
+	ASSERT0(type->type_kind == TYPE_POINTER);
 	Type *ptr = type->pointer;
 	switch (ptr->type_kind)
 	{
@@ -1894,9 +1903,9 @@ Type *type_decay_array_pointer(Type *type)
 #define MAX_SEARCH_DEPTH 512
 static inline Type *type_find_max_distinct_type(Type *left, Type *right)
 {
-	assert(left == left->canonical && right == right->canonical);
-	assert(left != right);
-	assert(left->type_kind == TYPE_DISTINCT && right->type_kind == TYPE_DISTINCT);
+	ASSERT0(left == left->canonical && right == right->canonical);
+	ASSERT0(left != right);
+	ASSERT0(left->type_kind == TYPE_DISTINCT && right->type_kind == TYPE_DISTINCT);
 	static Type *left_types[MAX_SEARCH_DEPTH];
 	int depth = 0;
 	while (depth < MAX_SEARCH_DEPTH)
@@ -1910,7 +1919,7 @@ static inline Type *type_find_max_distinct_type(Type *left, Type *right)
 	{
 		error_exit("Common ancestor search depth %d exceeded.", MAX_SEARCH_DEPTH);
 	}
-	assert(left != right);
+	ASSERT0(left != right);
 	while (true)
 	{
 		for (int i = 0; i < depth; i++)
@@ -1927,7 +1936,7 @@ Type *type_find_max_type(Type *type, Type *other)
 {
 	type = type->canonical;
 	other = other->canonical;
-	assert(!type_is_optional(type) && !type_is_optional(other));
+	ASSERT0(!type_is_optional(type) && !type_is_optional(other));
 
 RETRY_DISTINCT:
 	if (type == other) return type;

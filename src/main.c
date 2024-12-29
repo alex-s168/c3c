@@ -6,13 +6,12 @@
 
 
 bool debug_log = false;
-bool debug_stats = false;
 
 jmp_buf on_error_jump;
 
 NORETURN void exit_compiler(int exit_value)
 {
-	assert(exit_value != 0);
+	ASSERT0(exit_value != 0);
 	longjmp(on_error_jump, exit_value);
 }
 
@@ -73,7 +72,6 @@ int main_real(int argc, const char *argv[])
 		case COMMAND_UNIT_TEST:
 			compiler_tests();
 			break;
-		case COMMAND_GENERATE_HEADERS:
 		case COMMAND_COMPILE:
 		case COMMAND_COMPILE_ONLY:
 		case COMMAND_COMPILE_RUN:

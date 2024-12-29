@@ -234,10 +234,19 @@ lib = list((OUTPUT / "VC/Tools/MSVC/").glob("*/lib"))[0]
 
 SDK_OUTPUT.mkdir(exist_ok=True)
 
+def copy(src, dst):
+	low = dst.lower()
+	base = os.path.basename(low)
+	if base == "msvcrt.lib" or base == "oldnames.lib":
+		base = base[:-3].upper() + "lib"
+		path = os.path.join(os.path.dirname(low), base);
+		shutil.copy(src, path)
+	shutil.copy(src, low)
+
 for arch in archs:
 	out_dir = SDK_OUTPUT / arch
-	shutil.copytree(ucrt / arch, out_dir, dirs_exist_ok=True)
-	shutil.copytree(um / arch, out_dir, dirs_exist_ok=True)
-	shutil.copytree(lib / arch, out_dir, dirs_exist_ok=True)
+	shutil.copytree(ucrt / arch, out_dir, copy_function=copy, dirs_exist_ok=True)
+	shutil.copytree(um / arch, out_dir, copy_function=copy, dirs_exist_ok=True)
+	shutil.copytree(lib / arch, out_dir, copy_function=copy, dirs_exist_ok=True)
 
 print("Congratulations! The 'msvc_sdk' directory was successfully generated.")

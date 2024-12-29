@@ -40,10 +40,10 @@ const char *trust_level[3];
 
 #define EOUTPUT(string, ...) fprintf(stderr, string "\n", ##__VA_ARGS__) // NOLINT
 #define PRINTF(string, ...) fprintf(stdout, string "\n", ##__VA_ARGS__) // NOLINT
-#define FAIL_WITH_ERR(string, ...) do { fprintf(stderr, "Error: " string "\n\n", ##__VA_ARGS__); usage(); exit_compiler(EXIT_FAILURE); } while (0) /* NOLINT */
+#define FAIL_WITH_ERR(string, ...) do { fprintf(stderr, "Error: " string "\n\n", ##__VA_ARGS__); usage(false); exit_compiler(EXIT_FAILURE); } while (0) /* NOLINT */
 #define PROJECT_FAIL_WITH_ERR(string, ...) do { fprintf(stderr, "Error: " string "\n\n", ##__VA_ARGS__); project_usage(); exit_compiler(EXIT_FAILURE); } while (0) /* NOLINT */
 
-static void usage(void)
+static void usage(bool full)
 {
 	PRINTF("Usage: %s [<options>] <command> [<args>]", args[0]);
 	PRINTF("");
@@ -71,18 +71,11 @@ static void usage(void)
 	PRINTF("  vendor-fetch <library> ...                          Fetches one or more libraries from the vendor collection.");
 	PRINTF("  project <subcommand> ...                            Manipulate or view project files.");
 	PRINTF("");
-	PRINTF("Options:");
-	PRINTF("  --stdlib <dir>             - Use this directory as the C3 standard library path.");
-	PRINTF("  --no-entry                 - Do not generate (or require) a main function.");
-	PRINTF("  --libdir <dir>             - Add this directory to the C3 library search paths.");
-	PRINTF("  --lib <name>               - Add this library to the compilation.");
-	PRINTF("  --path <dir>               - Use this as the base directory for the current command.");
-	PRINTF("  --template <template>      - Select template for 'init': \"exe\", \"static-lib\", \"dynamic-lib\" or a path.");
-	PRINTF("  --about                    - Prints a short description of C3.");
-	PRINTF("  --symtab <value>           - Sets the preferred symtab size.");
-	PRINTF("  --max-mem <value>          - Sets the preferred max memory size.");
-	PRINTF("  --run-once                 - After running the output file, delete it immediately.");
+	PRINTF(full ? "Options:" : "Common options:");
+	PRINTF("  -h -hh --help              - Print the help, -h for the normal options, -hh for the full help.");
 	PRINTF("  -V --version               - Print version information.");
+	PRINTF("  -q --quiet                 - Silence unnecessary output.");
+	PRINTF("  -v -vv -vvv                - Verbose output, -v for default, -vv and -vvv gives more information.");
 	PRINTF("  -E                         - Lex only.");
 	PRINTF("  -P                         - Only parse and output the AST as JSON.");
 	PRINTF("  -C                         - Only lex, parse and check.");
@@ -98,90 +91,106 @@ static void usage(void)
 	PRINTF("  -Oz                        - Unsafe, high optimization, tiny code, single module, no debug info, no panic messages, no backtrace.");
 	PRINTF("  -D <name>                  - Add feature flag <name>.");
 	PRINTF("  -U <name>                  - Remove feature flag <name>.");
-	PRINTF("  --trust=<option>           - Trust level: none (default), include ($include allowed), full ($exec / exec allowed).");
-	PRINTF("  --output-dir <dir>         - Override general output directory.");
-	PRINTF("  --build-dir <dir>          - Override build output directory.");
-	PRINTF("  --obj-out <dir>            - Override object file output directory.");
-	PRINTF("  --script-dir <dir>         - Override the base directory for $exec.");
-	PRINTF("  --llvm-out <dir>           - Override llvm output directory for '--emit-llvm'.");
-	PRINTF("  --emit-llvm                - Emit LLVM IR as a .ll file per module.");
-	PRINTF("  --asm-out <dir>            - Override asm output directory for '--emit-asm'.");
-	PRINTF("  --emit-asm                 - Emit asm as a .s file per module.");
-	PRINTF("  --obj                      - Emit object files. (Enabled by default)");
-	PRINTF("  --no-obj                   - Do not output object files, this is only valid for `compile-only`.");
-	PRINTF("  --no-headers               - Do not generate C headers when building a library.");
-	PRINTF("  --target <target>          - Compile for a particular architecture + OS target.");
-	PRINTF("  --threads <number>         - Set the number of threads to use for compilation.");
-	PRINTF("  --safe=<yes|no>            - Turn safety (contracts, runtime bounds checking, null pointer checks etc) on or off.");
-	PRINTF("  --panic-msg=<yes|no>       - Turn panic message output on or off.");
-	PRINTF("  --optlevel=<option>        - Code optimization level: none, less, more, max.");
-	PRINTF("  --optsize=<option>         - Code size optimization: none, small, tiny.");
-	PRINTF("  --single-module=<yes|no>   - Compile all modules together, enables more inlining.");
-	PRINTF("  --show-backtrace=<yes|no>  - Show detailed backtrace on segfaults.");
-#if VXCC_AVAILABLE
-    PRINTF("  --experimental-vxcc        - Use the VXCC backend for compilation (probably does not work for you).");
-#endif
-    PRINTF("");
+	PRINTF("");
+	PRINTF("  --about                    - Prints a short description of C3.");
+	PRINTF("  --libdir <dir>             - Add this directory to the c3l library search paths.");
+	PRINTF("  --lib <name>               - Add this c3l library to the compilation.");
+	if (full)
+	{
+		PRINTF("  --stdlib <dir>             - Use this directory as the C3 standard library path.");
+		PRINTF("  --no-entry                 - Do not generate (or require) a main function.");
+		PRINTF("  --path <dir>               - Use this as the base directory for the current command.");
+		PRINTF("  --template <template>      - Select template for 'init': \"exe\", \"static-lib\", \"dynamic-lib\" or a path.");
+		PRINTF("  --symtab <value>           - Sets the preferred symtab size.");
+		PRINTF("  --max-mem <value>          - Sets the preferred max memory size.");
+		PRINTF("  --run-once                 - After running the output file, delete it immediately.");
+		PRINTF("  --trust=<option>           - Trust level: none (default), include ($include allowed), full ($exec / exec allowed).");
+		PRINTF("  --output-dir <dir>         - Override general output directory.");
+		PRINTF("  --build-dir <dir>          - Override build output directory.");
+		PRINTF("  --obj-out <dir>            - Override object file output directory.");
+		PRINTF("  --script-dir <dir>         - Override the base directory for $exec.");
+		PRINTF("  --llvm-out <dir>           - Override llvm output directory for '--emit-llvm'.");
+		PRINTF("  --emit-llvm                - Emit LLVM IR as a .ll file per module.");
+		PRINTF("  --asm-out <dir>            - Override asm output directory for '--emit-asm'.");
+		PRINTF("  --emit-asm                 - Emit asm as a .s file per module.");
+		PRINTF("  --obj                      - Emit object files. (Enabled by default)");
+		PRINTF("  --no-obj                   - Do not output object files, this is only valid for `compile-only`.");
+		PRINTF("  --no-headers               - Do not generate C headers when building a library.");
+		PRINTF("  --target <target>          - Compile for a particular architecture + OS target.");
+		PRINTF("  --threads <number>         - Set the number of threads to use for compilation.");
+		PRINTF("  --safe=<yes|no>            - Turn safety (contracts, runtime bounds checking, null pointer checks etc) on or off.");
+		PRINTF("  --panic-msg=<yes|no>       - Turn panic message output on or off.");
+		PRINTF("  --optlevel=<option>        - Code optimization level: none, less, more, max.");
+		PRINTF("  --optsize=<option>         - Code size optimization: none, small, tiny.");
+		PRINTF("  --single-module=<yes|no>   - Compile all modules together, enables more inlining.");
+		PRINTF("  --show-backtrace=<yes|no>  - Show detailed backtrace on segfaults.");
+	}
+	PRINTF("");
 	PRINTF("  -g                         - Emit debug info.");
 	PRINTF("  -g0                        - Emit no debug info.");
 	PRINTF("");
 	PRINTF("  -l <library>               - Link with the library provided.");
 	PRINTF("  -L <library dir>           - Append the directory to the linker search paths.");
 	PRINTF("  -z <argument>              - Send the <argument> as a parameter to the linker.");
-	PRINTF("  --cc <path>                - Set C compiler (for C files in projects and use as system linker).");
-	PRINTF("  --linker=<option> [<path>] - Linker: builtin, cc, custom (default is 'cc'), 'custom' requires a path.");
-	PRINTF("");
-	PRINTF("  --use-stdlib=<yes|no>      - Include the standard library (default: yes).");
-	PRINTF("  --link-libc=<yes|no>       - Link libc other default libraries (default: yes).");
-	PRINTF("  --emit-stdlib=<yes|no>     - Output files for the standard library. (default: yes)");
-	PRINTF("  --panicfn <name>           - Override the panic function name.");
-	PRINTF("  --testfn <name>            - Override the test runner function name.");
-	PRINTF("  --benchfn <name>           - Override the benchmark runner function name.");
-	PRINTF("");
-	PRINTF("  --reloc=<option>           - Relocation model: none, pic, PIC, pie, PIE.");
-	PRINTF("  --x86cpu=<option>          - Set general level of x64 cpu: baseline, ssse3, sse4, avx1, avx2-v1, avx2-v2 (Skylake/Zen1+), avx512 (Icelake/Zen4+), native.");
-	PRINTF("  --x86vec=<option>          - Set max type of vector use: none, mmx, sse, avx, avx512, default.");
-	PRINTF("  --riscvfloat=<option>      - Set type of RISC-V float support: none, float, double");
-	PRINTF("  --memory-env=<option>      - Set the memory environment: normal, small, tiny, none.");
-	PRINTF("  --strip-unused=<yes|no>    - Strip unused code and globals from the output. (default: yes)");
-	PRINTF("  --fp-math=<option>         - FP math behaviour: strict, relaxed, fast.");
-	PRINTF("  --win64-simd=<option>      - Win64 SIMD ABI: array, full.");
-	PRINTF("");
-	PRINTF("  --debug-stats              - Print debug statistics.");
-	PRINTF("  --print-linking            - Print linker arguments.");
-#ifndef NDEBUG
-	PRINTF("  --debug-log                - Print debug logging to stdout.");
-#endif
-	PRINTF("");
-	PRINTF("  --benchmarking             - Run built-in benchmarks.");
-	PRINTF("  --testing                  - Run built-in tests.");
-	PRINTF("");
-	PRINTF("  --list-attributes          - List all attributes.");
-	PRINTF("  --list-builtins            - List all builtins.");
-	PRINTF("  --list-keywords            - List all keywords.");
-	PRINTF("  --list-operators           - List all operators.");
-	PRINTF("  --list-precedence          - List operator precedence order.");
-	PRINTF("  --list-project-properties  - List all available keys used in project.json files.");
-	PRINTF("  --list-manifest-properties - List all available keys used in manifest.json files.");
-	PRINTF("  --list-targets             - List all architectures the compiler supports.");
-	PRINTF("  --list-type-properties     - List all type properties.");
-	PRINTF("");
-	PRINTF("  --print-output             - Print the object files created to stdout.");
-	PRINTF("  --print-input              - Print inputted C3 files to stdout.");
-	PRINTF("");
-	PRINTF("  --winsdk <dir>             - Set the directory for Windows system library files for cross compilation.");
-	PRINTF("  --wincrt=<option>          - Windows CRT linking: none, static-debug, static, dynamic-debug (default if debug info enabled), dynamic (default).");
-	PRINTF("  --windef <file>            - Use Windows 'def' file for function exports instead of 'dllexport'.");
-	PRINTF("");
-	PRINTF("  --macossdk <dir>           - Set the directory for the MacOS SDK for cross compilation.");
-	PRINTF("  --macos-min-version <ver>  - Set the minimum MacOS version to compile for.");
-	PRINTF("  --macos-sdk-version <ver>  - Set the MacOS SDK compiled for.");
-	PRINTF("");
-	PRINTF("  --linux-crt <dir>          - Set the directory to use for finding crt1.o and related files.");
-	PRINTF("  --linux-crtbegin <dir>     - Set the directory to use for finding crtbegin.o and related files.");
-	PRINTF("");
-	PRINTF("  --vector-conv=<option>     - Set vector conversion behaviour: default, old.");
-	PRINTF("  --sanitize=<option>        - Enable sanitizer: address, memory, thread.");
+	if (full)
+	{
+		PRINTF("  --cc <path>                - Set C compiler (for C files in projects and use as system linker).");
+		PRINTF("  --linker=<option> [<path>] - Linker: builtin, cc, custom (default is 'cc'), 'custom' requires a path.");
+		PRINTF("");
+		PRINTF("  --use-stdlib=<yes|no>      - Include the standard library (default: yes).");
+		PRINTF("  --link-libc=<yes|no>       - Link libc other default libraries (default: yes).");
+		PRINTF("  --emit-stdlib=<yes|no>     - Output files for the standard library. (default: yes)");
+		PRINTF("  --panicfn <name>           - Override the panic function name.");
+		PRINTF("  --testfn <name>            - Override the test runner function name.");
+		PRINTF("  --benchfn <name>           - Override the benchmark runner function name.");
+		PRINTF("");
+		PRINTF("  --reloc=<option>           - Relocation model: none, pic, PIC, pie, PIE.");
+		PRINTF("  --x86cpu=<option>          - Set general level of x64 cpu: baseline, ssse3, sse4, avx1, avx2-v1, avx2-v2 (Skylake/Zen1+), avx512 (Icelake/Zen4+), native.");
+		PRINTF("  --x86vec=<option>          - Set max type of vector use: none, mmx, sse, avx, avx512, default.");
+		PRINTF("  --riscvfloat=<option>      - Set type of RISC-V float support: none, float, double");
+		PRINTF("  --memory-env=<option>      - Set the memory environment: normal, small, tiny, none.");
+		PRINTF("  --strip-unused=<yes|no>    - Strip unused code and globals from the output. (default: yes)");
+		PRINTF("  --fp-math=<option>         - FP math behaviour: strict, relaxed, fast.");
+		PRINTF("  --win64-simd=<option>      - Win64 SIMD ABI: array, full.");
+		PRINTF("");
+		PRINTF("  --print-linking            - Print linker arguments.");
+		PRINTF("");
+		PRINTF("  --benchmarking             - Run built-in benchmarks.");
+		PRINTF("  --testing                  - Run built-in tests.");
+		PRINTF("");
+		PRINTF("  --list-attributes          - List all attributes.");
+		PRINTF("  --list-builtins            - List all builtins.");
+		PRINTF("  --list-keywords            - List all keywords.");
+		PRINTF("  --list-operators           - List all operators.");
+		PRINTF("  --list-precedence          - List operator precedence order.");
+		PRINTF("  --list-project-properties  - List all available keys used in project.json files.");
+		PRINTF("  --list-manifest-properties - List all available keys used in manifest.json files.");
+		PRINTF("  --list-targets             - List all architectures the compiler supports.");
+		PRINTF("  --list-type-properties     - List all type properties.");
+		PRINTF("");
+		PRINTF("  --print-output             - Print the object files created to stdout.");
+		PRINTF("  --print-input              - Print inputted C3 files to stdout.");
+		PRINTF("");
+		PRINTF("  --winsdk <dir>             - Set the directory for Windows system library files for cross compilation.");
+		PRINTF("  --wincrt=<option>          - Windows CRT linking: none, static-debug, static, dynamic-debug (default if debug info enabled), dynamic (default).");
+		PRINTF("  --windef <file>            - Use Windows 'def' file for function exports instead of 'dllexport'.");
+		PRINTF("  --win-vs-dirs <dir>;<dir> - Override Windows VS detection.");
+		PRINTF("");
+		PRINTF("  --macossdk <dir>           - Set the directory for the MacOS SDK for cross compilation.");
+		PRINTF("  --macos-min-version <ver>  - Set the minimum MacOS version to compile for.");
+		PRINTF("  --macos-sdk-version <ver>  - Set the MacOS SDK compiled for.");
+		PRINTF("");
+		PRINTF("  --linux-crt <dir>          - Set the directory to use for finding crt1.o and related files.");
+		PRINTF("  --linux-crtbegin <dir>     - Set the directory to use for finding crtbegin.o and related files.");
+		PRINTF("");
+		PRINTF("  --vector-conv=<option>     - Set vector conversion behaviour: default, old.");
+		PRINTF("  --sanitize=<option>        - Enable sanitizer: address, memory, thread.");
+	}
+	if (!full)
+	{
+		PRINTF("");
+		PRINTF("Use -hh to view the full list of options.");
+	}
 }
 
 static void project_usage()
@@ -189,8 +198,8 @@ static void project_usage()
 	PRINTF("Usage: %s [<options>] project <subcommand> [<args>]", args[0]);
 	PRINTF("");
 	PRINTF("Project Subcommands:");
-	PRINTF("  view                                          view the current projects structure");
-	PRINTF("  add-target <name>  <target_type>              add a new target to the project");
+	PRINTF("  view                                            view the current projects structure");
+	PRINTF("  add-target <name>  <target_type>  [sources...]  add a new target to the project");
 	#if FETCH_AVAILABLE
 		PRINTF("  fetch              							fetch missing project libraries");
 	#endif
@@ -212,6 +221,11 @@ static void parse_project_subcommand(BuildOptions *options)
 
 		if (at_end() || next_is_opt()) error_exit("Expected a target type like 'executable' or 'static-lib'");
 		options->project_options.target_type = (TargetType)get_valid_enum_from_string(next_arg(), "type", targets, ELEMENTLEN(targets), "a target type like 'executable' or 'static-lib'");
+
+		while (!at_end() && !next_is_opt())
+		{
+			vec_add(options->project_options.sources, next_arg());
+		}
 
 		return;
 	}
@@ -279,11 +293,6 @@ static void parse_command(BuildOptions *options)
 		options->command = COMMAND_COMPILE_ONLY;
 		return;
 	}
-	if (arg_match("headers"))
-	{
-		options->command = COMMAND_GENERATE_HEADERS;
-		return;
-	}
 	if (arg_match("static-lib"))
 	{
 		options->command = COMMAND_STATIC_LIB;
@@ -321,6 +330,7 @@ static void parse_command(BuildOptions *options)
 	{
 		options->command = COMMAND_TEST;
 		options->testing = true;
+		parse_optional_target(options);
 		return;
 	}
 	if (arg_match("run"))
@@ -405,11 +415,40 @@ static void parse_option(BuildOptions *options)
 		case '\0':
 			options->read_stdin = true;
 			return;
-		case '?':
-			if (match_shortopt("?"))
+		case 'h':
+			if (match_shortopt("hh"))
 			{
-				usage();
+				usage(true);
 				exit_compiler(COMPILER_SUCCESS_EXIT);
+			}
+			if (match_shortopt("h"))
+			{
+				usage(false);
+				exit_compiler(COMPILER_SUCCESS_EXIT);
+			}
+			break;
+		case 'q':
+			if (match_shortopt("q"))
+			{
+				options->verbosity_level = -1;
+				return;
+			}
+			break;
+		case 'v':
+			if (match_shortopt("vvv"))
+			{
+				options->verbosity_level = 3;
+				return;
+			}
+			if (match_shortopt("vv"))
+			{
+				options->verbosity_level = 2;
+				return;
+			}
+			if (match_shortopt("v"))
+			{
+				options->verbosity_level = 1;
+				return;
 			}
 			break;
 		case 'V':
@@ -436,8 +475,6 @@ static void parse_option(BuildOptions *options)
 				return;
 			}
 			FAIL_WITH_ERR("Unknown debug argument -%s.", &current_arg[1]);
-		case 'h':
-			break;
 		case 'z':
 			if (match_shortopt("z"))
 			{
@@ -579,13 +616,6 @@ static void parse_option(BuildOptions *options)
 			}
 			break;
 		case '-':
-#if VXCC_AVAILABLE
-            if (match_longopt("experimental-vxcc"))
-            {
-                options->backend = BACKEND_VXCC;
-                return;
-            }
-#endif 
 			if (match_longopt("max-mem"))
 			{
 				if (at_end() || next_is_opt()) error_exit("error: --max-mem needs a valid integer.");
@@ -609,14 +639,25 @@ static void parse_option(BuildOptions *options)
 				options->symtab_size = next_highest_power_of_2(symtab);
 				return;
 			}
+			if (match_longopt("quiet"))
+			{
+				options->verbosity_level = -1;
+				return;
+			}
 			if (match_longopt("version"))
 			{
 				print_version();
 				exit_compiler(COMPILER_SUCCESS_EXIT);
 			}
+			if ((argopt = match_argopt("backend")))
+			{
+				options->backend = (CompilerBackend)parse_multi_option(argopt, sizeof(backends) / sizeof(*backends), backends);
+				return;
+			}
 			if (match_longopt("run-once"))
 			{
 				options->run_once = true;
+				if (!options->verbosity_level) options->verbosity_level = -1;
 				return;
 			}
 			if ((argopt = match_argopt("fp-math")))
@@ -734,17 +775,6 @@ static void parse_option(BuildOptions *options)
 			if (match_longopt("no-headers"))
 			{
 				options->no_headers = true;
-				return;
-			}
-			if (match_longopt("debug-log"))
-			{
-				debug_log = true;
-				debug_stats = true;
-				return;
-			}
-			if (match_longopt("debug-stats"))
-			{
-				debug_stats = true;
 				return;
 			}
 			if (match_longopt("print-linking"))
@@ -898,6 +928,10 @@ static void parse_option(BuildOptions *options)
 			}
 			if (match_longopt("winsdk"))
 			{
+				if (options->win.vs_dirs)
+				{
+					error_exit("error: --winsdk cannot be combined with --win-vs-dirs.");
+				}
 				if (at_end() || next_is_opt()) error_exit("error: --winsdk needs a directory.");
 				options->win.sdk = check_dir(next_arg());
 				return;
@@ -921,6 +955,16 @@ static void parse_option(BuildOptions *options)
 			if ((argopt = match_argopt("wincrt")))
 			{
 				options->win.crt_linking = (WinCrtLinking)parse_multi_option(argopt, 5, wincrt_linking);
+				return;
+			}
+			if (match_longopt("win-vs-dirs"))
+			{
+				if (options->win.sdk)
+				{
+					error_exit("error: --win-vs-dirs cannot be combined with --winsdk.");
+				}
+				if (at_end() || next_is_opt()) error_exit("error: --win-vs-dirs needs to followed by the directories.");
+				options->win.vs_dirs = next_arg();
 				return;
 			}
 			if ((argopt = match_argopt("sanitize")))
@@ -1063,7 +1107,7 @@ static void parse_option(BuildOptions *options)
 			}
 			if (match_longopt("help"))
 			{
-				usage();
+				usage(true);
 				exit_compiler(COMPILER_SUCCESS_EXIT);
 			}
 			break;
@@ -1081,7 +1125,7 @@ BuildOptions parse_arguments(int argc, const char *argv[])
 
 	if (argc < 2)
 	{
-		usage();
+		usage(false);
 		exit_compiler(COMPILER_SUCCESS_EXIT);
 	}
 
@@ -1160,7 +1204,7 @@ BuildOptions parse_arguments(int argc, const char *argv[])
 			parse_command(&build_options);
 			continue;
 		}
-		if (command_accepts_files(build_options.command) || build_options.command == COMMAND_GENERATE_HEADERS)
+		if (command_accepts_files(build_options.command))
 		{
 			append_file(&build_options);
 			continue;
@@ -1171,6 +1215,7 @@ BuildOptions parse_arguments(int argc, const char *argv[])
 	{
 		FAIL_WITH_ERR("Missing a compiler command such as 'compile' or 'build'.");
 	}
+	debug_log = build_options.verbosity_level > 2;
 	return build_options;
 }
 
@@ -1207,7 +1252,7 @@ static inline bool at_end()
 
 static inline const char *next_arg()
 {
-	assert(!at_end());
+	ASSERT0(!at_end());
 	current_arg = args[++arg_index];
 	return current_arg;
 }

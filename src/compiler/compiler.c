@@ -17,6 +17,8 @@
 
 #define MAX_OUTPUT_FILES 1000000
 #define MAX_MODULES 100000
+
+
 CompilerState compiler;
 
 Vmem ast_arena;
@@ -33,6 +35,13 @@ static double compiler_link_time;
 
 const char* c3_suffix_list[3] = { ".c3", ".c3t", ".c3i" };
 
+
+static const char *out_name(void)
+{
+	if (compiler.build.output_name) return compiler.build.output_name;
+	if (compiler.build.name) return compiler.build.name;
+	return NULL;
+}
 
 void compiler_init(BuildOptions *build_options)
 {
@@ -94,14 +103,14 @@ static void compiler_lex(void)
 		if (loaded) continue;
 		Lexer lexer = { .file = file };
 		lexer_init(&lexer);
-		printf("# %s\n", file->full_path);
+		OUTF("# %s\n", file->full_path);
 		while (lexer_next_token(&lexer))
 		{
 			TokenType token_type = lexer.token_type;
-			printf("%s ", token_type_to_string(token_type));
+			OUTF("%s ", token_type_to_string(token_type));
 			if (token_type == TOKEN_EOF) break;
 		}
-		printf("\n");
+		OUTN("");
 	}
 	exit_compiler(COMPILER_SUCCESS_EXIT);
 }
@@ -167,12 +176,8 @@ void **tilde_gen(Module** modules, unsigned module_count)
 
 const char *build_base_name(void)
 {
-	const char *name;
-	if (compiler.build.name)
-	{
-		name = compiler.build.name;
-	}
-	else
+	const char *name = out_name();
+	if (!name)
 	{
 		Module **modules = compiler.context.module_list;
 		Module *main_module = (modules[0] == compiler.context.core_module && vec_size(modules) > 1) ? modules[1] : modules[0];
@@ -193,13 +198,13 @@ const char *build_base_name(void)
 
 static const char *exe_name(void)
 {
-	assert(compiler.context.main || compiler.build.no_entry);
-	const char *name;
-	if (compiler.build.name || compiler.build.no_entry)
+	ASSERT0(compiler.build.output_name || compiler.build.name || compiler.context.main || compiler.build.no_entry);
+	const char *name = out_name();
+	if (!name && compiler.build.no_entry)
 	{
-		name = compiler.build.name ? compiler.build.name : "out";
+		name = "out";
 	}
-	else
+	if (!name)
 	{
 		Path *path = compiler.context.main->unit->module->name;
 		size_t first = 0;
@@ -258,7 +263,7 @@ static const char *static_lib_name(void)
 
 static void free_arenas(void)
 {
-	if (debug_stats)
+	if (compiler.build.print_stats)
 	{
 		printf("-- AST/EXPR/TYPE INFO -- \n");
 		printf(" * Ast size: %u bytes\n", (unsigned)sizeof(Ast));
@@ -285,7 +290,7 @@ static void free_arenas(void)
 	expr_arena_free();
 	type_info_arena_free();
 
-	if (debug_stats) print_arena_status();
+	if (compiler.build.print_stats) print_arena_status();
 }
 
 static int compile_cfiles(const char *cc, const char **files, const char *flags, const char **include_dirs,
@@ -302,7 +307,7 @@ static int compile_cfiles(const char *cc, const char **files, const char *flags,
 
 static void compiler_print_bench(void)
 {
-	if (debug_stats)
+	if (compiler.build.print_stats)
 	{
 		puts("--------- Compilation time statistics --------\n");
 		double last = compiler_init_time;
@@ -443,6 +448,7 @@ void compiler_compile(void)
 	void **gen_contexts;
 	void (*task)(void *);
 
+
 	if (compiler.build.asm_file_dir || compiler.build.ir_file_dir || compiler.build.emit_object_files)
 	{
 		if (compiler.build.build_dir && !file_exists(compiler.build.build_dir) && !dir_make(compiler.build.build_dir))
@@ -481,6 +487,9 @@ void compiler_compile(void)
 
 	switch (compiler.build.backend)
 	{
+		case BACKEND_C:
+			gen_contexts = c_gen(modules, module_count);
+			error_exit("Unfinished C backend!");
 		case BACKEND_LLVM:
 #if LLVM_AVAILABLE
 			gen_contexts = llvm_gen(modules, module_count);
@@ -518,7 +527,7 @@ void compiler_compile(void)
 				output_exe = exe_name();
 				break;
 			case TARGET_TYPE_EXECUTABLE:
-				assert(compiler.context.main || compiler.build.no_entry);
+				ASSERT0(compiler.context.main || compiler.build.no_entry);
 				output_exe = exe_name();
 				break;
 			case TARGET_TYPE_STATIC_LIB:
@@ -572,7 +581,7 @@ void compiler_compile(void)
 	{
 		int compiled = compile_cfiles(compiler.build.cc, compiler.build.csources,
 		                              compiler.build.cflags, compiler.build.cinclude_dirs, &obj_files[output_file_count], "tmp_c_compile");
-		assert(cfiles == compiled);
+		ASSERT0(cfiles == compiled);
 		(void)compiled;
 	}
 	const char **obj_file_next = &obj_files[output_file_count + cfiles];
@@ -612,14 +621,16 @@ void compiler_compile(void)
 	{
 		puts("# output-files-begin");
 	}
-	for (unsigned i = 0; i < output_file_count; i++)
+	int index = 0;
+	for (unsigned i = output_file_count; i > 0; i--)
 	{
-		obj_files[i] = compile_data[i].object_name;
+		const char *name = compile_data[i - 1].object_name;
+		if (!name) output_file_count--;
+		obj_files[index++] = name;
 		if (compiler.build.print_output)
 		{
-			puts(obj_files[i]);
+			puts(name);
 		}
-		assert(obj_files[i] || !output_exe);
 	}
 	if (compiler.build.print_output)
 	{
@@ -630,6 +641,14 @@ void compiler_compile(void)
 	free(compile_data);
 	compiler_codegen_time = bench_mark();
 
+	if ((output_static || output_dynamic || output_exe) && !output_file_count)
+	{
+		if (!compiler.build.object_files)
+		{
+			error_exit("Compilation could not complete due to --no-obj, please try removing it.");
+		}
+		error_exit("Compilation produced no object files, maybe there was no code?");
+	}
 	if (output_exe)
 	{
 		if (compiler.build.output_dir)
@@ -712,11 +731,11 @@ void compiler_compile(void)
 				scratch_buffer_append(name);
 			}
 			name = scratch_buffer_to_string();
-			printf("Launching %s", name);
+			OUTF("Launching %s", name);
 			for (uint32_t i = 0; i < vec_size(compiler.build.args); ++i) {
-				printf(" %s", compiler.build.args[i]);
+				OUTF(" %s", compiler.build.args[i]);
 			}
-			printf("\n");
+			OUTN("");
 
 			int ret = run_subprocess(name, compiler.build.args);
 			if (compiler.build.delete_after_run)
@@ -724,7 +743,7 @@ void compiler_compile(void)
 				file_delete_file(name);
 			}
 			if (ret < 0) exit_compiler(EXIT_FAILURE);
-			printf("Program completed with exit code %d.\n", ret);
+			OUTF("Program completed with exit code %d.\n", ret);
 			if (ret != 0) exit_compiler(ret);
 		}
 	}
@@ -746,7 +765,7 @@ void compiler_compile(void)
 		delete_object_files(obj_files, output_file_count);
 		compiler_link_time = bench_mark();
 		compiler_print_bench();
-		printf("Static library '%s' created.\n", output_static);
+		OUTF("Static library '%s' created.\n", output_static);
 	}
 	else if (output_dynamic)
 	{
@@ -764,7 +783,7 @@ void compiler_compile(void)
 			error_exit("Failed to produce dynamic library '%s'.", output_dynamic);
 		}
 		delete_object_files(obj_files, output_file_count);
-		printf("Dynamic library '%s' created.\n", output_dynamic);
+		OUTF("Dynamic library '%s' created.\n", output_dynamic);
 		compiler_link_time = bench_mark();
 		compiler_print_bench();
 	}
@@ -774,60 +793,6 @@ void compiler_compile(void)
 	}
 	free(obj_files);
 }
-
-static const char **target_expand_source_names(const char *base_dir, const char** dirs, const char **suffix_list, const char ***object_list_ref, int suffix_count, bool error_on_mismatch)
-{
-	const char **files = NULL;
-	FOREACH(const char *, name, dirs)
-	{
-		if (base_dir) name = file_append_path(base_dir, name);
-		INFO_LOG("Searching for sources in %s", name);
-		size_t name_len = strlen(name);
-		if (name_len < 1) goto INVALID_NAME;
-		if (object_list_ref && (str_has_suffix(name, ".o") || str_has_suffix(name, ".obj")))
-		{
-			if (!file_exists(name))
-			{
-				if (!error_on_mismatch) continue;
-				error_exit("The object file '%s' could not be found.", name);
-			}
-			vec_add(*object_list_ref, name);
-			continue;
-		}
-		if (name[name_len - 1] == '*')
-		{
-			if (name_len == 1 || name[name_len - 2] == '/')
-			{
-				char *path = str_copy(name, name_len - 1);
-				file_add_wildcard_files(&files, path, false, suffix_list, suffix_count);
-				continue;
-			}
-			if (name[name_len - 2] != '*') goto INVALID_NAME;
-			INFO_LOG("Searching for wildcard sources in %s", name);
-			if (name_len == 2 || name[name_len - 3] == '/')
-			{
-				const char *path = str_copy(name, name_len - 2);
-				DEBUG_LOG("Reduced path %s", path);
-				file_add_wildcard_files(&files, path, true, suffix_list, suffix_count);
-				continue;
-			}
-			goto INVALID_NAME;
-		}
-		if (!file_has_suffix_in_list(name, name_len, suffix_list, suffix_count)) goto INVALID_NAME;
-		vec_add(files, name);
-		continue;
-		INVALID_NAME:
-		if (file_is_dir(name))
-		{
-			file_add_wildcard_files(&files, name, true, suffix_list, suffix_count);
-			continue;
-		}
-		if (!error_on_mismatch) continue;
-		error_exit("File names must be a non-empty name followed by %s or they cannot be compiled: '%s' is invalid.", suffix_list[0], name);
-	}
-	return files;
-}
-
 INLINE void expand_csources(const char *base_dir, const char **source_dirs, const char ***sources_ref)
 {
 	if (source_dirs)
@@ -874,9 +839,9 @@ void compile_file_list(BuildOptions *options)
 		{
 			error_exit("The target is a 'prepare' target, and only 'build' can be used with it.");
 		}
-		printf("] Running prepare target '%s'.\n", options->target_select);
+		OUTF("] Running prepare target '%s'.\n", options->target_select);
 		execute_scripts();
-		printf("] Completed.\n.");
+		OUTF("] Completed.\n.");
 		return;
 	}
 	if (options->command == COMMAND_CLEAN_RUN)
@@ -899,7 +864,7 @@ static inline void setup_define(const char *id, Expr *expr)
 static void setup_int_define(const char *id, uint64_t i, Type *type)
 {
 	Type *flat = type_flatten(type);
-	assert(type_is_integer(flat));
+	ASSERT0(type_is_integer(flat));
 	Expr *expr = expr_new_const_int(INVALID_SPAN, flat, i);
 	expr->type = type;
 	if (expr_const_will_overflow(&expr->const_expr, flat->type_kind))
@@ -1003,7 +968,7 @@ void print_syntax(BuildOptions *options)
 			if (i == TOKEN_DOCS_START || i == TOKEN_DOCS_END) continue;
 			const char *name = token_type_to_string((TokenType)i);
 			char first_char = name[0];
-			if (first_char == '$' || first_char == '@'
+			if (first_char == '$' || first_char == '@' || first_char == '_' || first_char == '#'
 				|| (first_char >= 'a' && first_char <= 'z')
 				|| (first_char >= 'A' && first_char <= 'Z'))
 			{
@@ -1467,7 +1432,7 @@ void global_context_clear_errors(void)
 void global_context_add_type(Type *type)
 {
 	DEBUG_LOG("Created type %s.", type->name);
-	assert(type_ok(type));
+	ASSERT0(type_ok(type));
 	vec_add(compiler.context.type, type);
 }
 
@@ -1484,7 +1449,7 @@ const char *get_object_extension(void)
 
 Module *global_context_find_module(const char *name)
 {
-	assert(name);
+	ASSERT0(name);
 	return htable_get(&compiler.context.modules, (void *)name);
 }
 

@@ -20,6 +20,8 @@ const char* JSON_EXE =
 		"  \"version\": \"0.1.0\",\n"
 		"  // Sources compiled for all targets.\n"
 		"  \"sources\": [ \"src/**\" ],\n"
+		"  // Test sources compiled for all targets.\n"
+		"  \"test-sources\": [ \"test/**\" ],\n"
 		"  // C sources if the project also compiles C sources\n"
 		"  // relative to the project file.\n"
 		"  // \"c-sources\": [ \"csource/**\" ],\n"
@@ -63,6 +65,8 @@ const char* JSON_STATIC =
 		"  \"version\": \"0.1.0\",\n"
 		"  // Sources compiled for all targets.\n"
 		"  \"sources\": [ \"src/**\" ],\n"
+		"  // Test sources compiled for all targets.\n"
+		"  \"test-sources\": [ \"test/**\" ],\n"
 		"  // C sources if the project also compiles C sources\n"
 		"  // relative to the project file.\n"
 		"  // \"c-sources\": [ \"csource/**\" ],\n"
@@ -104,6 +108,8 @@ const char* JSON_DYNAMIC =
 		"  \"version\": \"0.1.0\",\n"
 		"  // Sources compiled for all targets.\n"
 		"  \"sources\": [ \"src/**\" ],\n"
+		"  // Test sources compiled for all targets.\n"
+		"  \"test-sources\": [ \"test/**\" ],\n"
 		"  // C sources if the project also compiles C sources\n"
 		"  // relative to the project file.\n"
 		"  // \"c-sources\": [ \"csource/**\" ],\n"
@@ -132,6 +138,7 @@ const char* JSON_DYNAMIC =
 const char *MANIFEST_TEMPLATE =
 		"{\n"
 		"  \"provides\" : \"%s\",\n"
+		"  // \"sources\" : [ \"src/**\" ],\n"
 		"  \"targets\" : {\n"
 		"%s"
 		"  }\n"
@@ -213,9 +220,11 @@ void create_library(BuildOptions *build_options)
 	}
 
 	chdir_or_fail(build_options, dir);
+
 	create_file_or_fail(build_options, "LICENSE", NULL);
 	create_file_or_fail(build_options, "README.md", LIB_README, build_options->project_name);
 	mkdir_or_fail(build_options, "scripts");
+
 	scratch_buffer_clear();
 	scratch_buffer_printf("%s.c3i", build_options->project_name);
 	const char *interface_file = scratch_buffer_copy();

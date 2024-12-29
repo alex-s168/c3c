@@ -44,6 +44,7 @@ const char *project_default_keys[][2] = {
 		{"single-module", "Compile all modules together, enables more inlining."},
 		{"soft-float", "Output soft-float functions."},
 		{"sources", "Paths to project sources for all targets."},
+		{"test-sources", "Paths to project test sources for all targets."},
 		{"strip-unused", "Strip unused code and globals from the output. (default: true)"},
 		{"symtab", "Sets the preferred symtab size."},
 		{"target", "Compile for a particular architecture + OS target."},
@@ -100,6 +101,7 @@ const char* project_target_keys[][2] = {
 		{"macos-sdk-version", "Set the MacOS SDK compiled for." },
 		{"macossdk", "Set the directory for the MacOS SDK for cross compilation."},
 		{"memory-env", "Set the memory environment: normal, small, tiny, none."},
+		{"name", "Set the name to be different from the target name."},
 		{"no-entry", "Do not generate (or require) a main function."},
 		{"opt", "Optimization setting: O0, O1, O2, O3, O4, O5, Os, Oz."},
 		{"optlevel", "Code optimization level: none, less, more, max."},
@@ -116,6 +118,8 @@ const char* project_target_keys[][2] = {
 		{"soft-float", "Output soft-float functions."},
 		{"sources", "Additional paths to project sources for the target."},
 		{"sources-override", "Paths to project sources for this target, overriding global settings."},
+		{"test-sources", "Additional paths to project test sources for the target."},
+		{"test-sources-override", "Paths to project test sources for this target, overriding global settings."},
 		{"strip-unused", "Strip unused code and globals from the output. (default: true)"},
 		{"symtab", "Sets the preferred symtab size."},
 		{"target", "Compile for a particular architecture + OS target."},
@@ -244,6 +248,9 @@ static void load_into_build_target(const char *filename, JSONObject *json, const
 	target->feature.panic_level = (PanicLevel)get_valid_bool(filename, target_name, json, "panic-msg",
 	                                                         target->feature.panic_level);
 
+	// Overridden name
+	target->output_name = get_optional_string(filename, target_name, json, "name");
+
 	// Single module
 	target->single_module = (SingleModule) get_valid_bool(filename, target_name, json, "single-module", target->single_module);
 
@@ -330,6 +337,9 @@ static void load_into_build_target(const char *filename, JSONObject *json, const
 	// riscvfloat
 	RiscvFloatCapability riscv_float = GET_SETTING(RiscvFloatCapability, "riscvfloat", riscv_capability, "`none`, `float` or `double`.");
 	if (riscv_float != RISCVFLOAT_DEFAULT) target->feature.riscv_float_capability = riscv_float;
+
+	// winsdk
+	target->win.vs_dirs = get_string(filename, target_name, json, "win-vs-dirs", target->win.vs_dirs);
 
 	// winsdk
 	target->win.sdk = get_string(filename, target_name, json, "winsdk", target->win.sdk);
@@ -421,12 +431,37 @@ static void load_into_build_target(const char *filename, JSONObject *json, const
 	                                                           target->feature.pass_win64_simd_as_arrays);
 }
 
+static void duplicate_prop(const char ***prop_ref)
+{
+	if (!*prop_ref) return;
+	const char **copy = NULL;
+	FOREACH(const char *, str, *prop_ref)
+	{
+		vec_add(copy, str);
+	}
+	*prop_ref = copy;
+}
 static void project_add_target(const char *filename, Project *project, BuildTarget *default_target, JSONObject *json,
                                const char *name, const char *type, TargetType target_type)
 {
-	assert(json->type == J_OBJECT);
+	ASSERT0(json->type == J_OBJECT);
 	BuildTarget *target = CALLOCS(BuildTarget);
 	*target = *default_target;
+	duplicate_prop(&target->args);
+	duplicate_prop(&target->csource_dirs);
+	duplicate_prop(&target->csources);
+	duplicate_prop(&target->cinclude_dirs);
+	duplicate_prop(&target->exec);
+	duplicate_prop(&target->feature_list);
+	duplicate_prop(&target->sources);
+	duplicate_prop(&target->source_dirs);
+	duplicate_prop(&target->test_source_dirs);
+	duplicate_prop(&target->libdirs);
+	duplicate_prop(&target->libs);
+	duplicate_prop(&target->linker_libdirs);
+	duplicate_prop(&target->linker_libs);
+	duplicate_prop(&target->link_args);
+
 	vec_add(project->targets, target);
 	target->name = name;
 	target->type = target_type;
@@ -444,7 +479,7 @@ static void project_add_target(const char *filename, Project *project, BuildTarg
 
 static void project_add_targets(const char *filename, Project *project, JSONObject *project_data)
 {
-	assert(project_data->type == J_OBJECT);
+	ASSERT0(project_data->type == J_OBJECT);
 
 	BuildTarget default_target = default_build_target;
 	load_into_build_target(filename, project_data, NULL, &default_target);

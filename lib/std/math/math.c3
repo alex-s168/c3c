@@ -132,6 +132,28 @@ macro deg_to_rad(x) {
 macro abs(x) => $$abs(x);
 
 <*
+ @require values::@is_int(x) || values::@is_float(x) "Expected an integer or floating point value"
+ @require values::@is_int(y) || values::@is_float(y) "Expected an integer or floating point value"
+*>
+macro is_approx(x, y, eps)
+{
+	if (x == y) return true;
+	if (is_nan(x) || is_nan(y)) return false;
+	return abs(x-y) <= eps; 
+}
+
+<*
+ @require values::@is_int(x) || values::@is_float(x) "Expected an integer or floating point value"
+ @require values::@is_int(y) || values::@is_float(y) "Expected an integer or floating point value"
+*>
+macro is_approx_rel(x, y, eps)
+{
+	if (x == y) return true;
+	if (is_nan(x) || is_nan(y)) return false;
+	return abs(x-y) <= eps * max(abs(x), abs(y)); 
+}
+
+<*
  @require values::@is_int(x) `The input must be an integer`
 *>
 macro sign(x)
@@ -290,7 +312,7 @@ macro copysign(mag, sgn) => $$copysign(values::promote_int_same(mag, sgn), ($typ
 <*
  @require values::@is_promotable_to_floatlike(x) `The input must be a number value or float vector`
 *>
-macro cos(x) => $$cos(x);
+macro cos(x) => $$cos(values::promote_int(x));
 
 <*
  @require values::@is_promotable_to_floatlike(x) `The input must be a number value or float vector`
@@ -1184,3 +1206,61 @@ macro long[<*>] long[<*>].muldiv(self, mul, div) => mul_div_helper(self, mul, di
  @require @is_same_vector_or_scalar(self, div) `div must be a vector of the same type as self, or be an integer scalar`
 *>
 macro ulong[<*>] ulong[<*>].muldiv(self, mul, div) => mul_div_helper(self, mul, div);
+
+<*
+@require types::is_int($typeof(a)) `The input must be an integer`
+@require types::is_int($typeof(b)) `The input must be an integer`
+*>
+macro _gcd(a, b) @private
+{
+	if (a == 0) return b;
+	if (b == 0) return a;
+
+	var $Type = $typeof(a);
+	$Type r, aa, ab;
+	aa = abs(a);
+	ab = abs(b);
+	while (ab != 0)
+	{
+		r = aa % ab;
+		aa = ab;
+		ab = r;
+	}
+	return aa;
+}
+
+<*
+Calculate the least common multiple for the provided arguments.
+
+@require $vacount >= 2 `At least two arguments are required.`
+*>
+macro lcm(...)
+{
+	$typeof($vaarg[0]) result = $vaarg[0];
+	$for (var $i = 1; $i < $vacount; $i++)
+		$if $defined(result.lcm):
+			result = result.lcm($vaarg[$i]);
+		$else
+			result = (abs($vaarg[$i]) * abs(result)) / (_gcd($vaarg[$i], result));
+		$endif
+	$endfor
+	return result;
+}
+
+<*
+Calculate the greatest common divisor for the provided arguments.
+
+@require $vacount >= 2 `At least two arguments are required.`
+*>
+macro gcd(...)
+{
+	$typeof($vaarg[0]) result = $vaarg[0];
+	$for (var $i = 1; $i < $vacount; $i++)
+		$if $defined(result.gcd):
+			result = result.gcd($vaarg[$i]);
+		$else
+			result = _gcd($vaarg[$i], result);
+		$endif
+	$endfor
+	return result;
+}

@@ -240,7 +240,7 @@ char *file_read_all(const char *path, size_t *return_size)
 	{
 		error_exit("Failed to read file \"%s\".\n", path);
 	}
-	assert(bytes_read == file_size);
+	ASSERT0(bytes_read == file_size);
 	buffer[bytes_read] = '\0';
 
 	size_t offset = 0;
@@ -527,8 +527,8 @@ extern int _chdrive(int drive);
 
 void file_copy_file(const char *src_path, const char *dst_path, bool overwrite)
 {
-	assert(src_path);
-	assert(dst_path);
+	ASSERT0(src_path);
+	ASSERT0(dst_path);
 #if (_MSC_VER)
 	CopyFileW(win_utf8to16(src_path), win_utf8to16(dst_path), !overwrite);
 #else
@@ -539,7 +539,7 @@ void file_copy_file(const char *src_path, const char *dst_path, bool overwrite)
 
 bool file_delete_file(const char *path)
 {
-	assert(path);
+	ASSERT0(path);
 #if (_MSC_VER)
 	return DeleteFileW(win_utf8to16(path));
 #else
@@ -549,7 +549,7 @@ bool file_delete_file(const char *path)
 
 void file_delete_all_files_in_dir_with_suffix(const char *path, const char *suffix)
 {
-	assert(path);
+	ASSERT0(path);
 #if (_MSC_VER)
 	const char *cmd = "del /q \"%s\\*%s\" >nul 2>&1";
 #else
@@ -639,6 +639,60 @@ void file_add_wildcard_files(const char ***files, const char *path, bool recursi
 }
 
 #endif
+
+const char **target_expand_source_names(const char *base_dir, const char** dirs, const char **suffix_list, const char ***object_list_ref, int suffix_count, bool error_on_mismatch)
+{
+	const char **files = NULL;
+	FOREACH(const char *, name, dirs)
+	{
+		if (base_dir) name = file_append_path(base_dir, name);
+		INFO_LOG("Searching for sources in %s", name);
+		size_t name_len = strlen(name);
+		if (name_len < 1) goto INVALID_NAME;
+		if (object_list_ref && (str_has_suffix(name, ".o") || str_has_suffix(name, ".obj")))
+		{
+			if (!file_exists(name))
+			{
+				if (!error_on_mismatch) continue;
+				error_exit("The object file '%s' could not be found.", name);
+			}
+			vec_add(*object_list_ref, name);
+			continue;
+		}
+		if (name[name_len - 1] == '*')
+		{
+			if (name_len == 1 || name[name_len - 2] == '/')
+			{
+				char *path = str_copy(name, name_len - 1);
+				file_add_wildcard_files(&files, path, false, suffix_list, suffix_count);
+				continue;
+			}
+			if (name[name_len - 2] != '*') goto INVALID_NAME;
+			INFO_LOG("Searching for wildcard sources in %s", name);
+			if (name_len == 2 || name[name_len - 3] == '/')
+			{
+				const char *path = str_copy(name, name_len - 2);
+				DEBUG_LOG("Reduced path %s", path);
+				file_add_wildcard_files(&files, path, true, suffix_list, suffix_count);
+				continue;
+			}
+			goto INVALID_NAME;
+		}
+		if (!file_has_suffix_in_list(name, name_len, suffix_list, suffix_count)) goto INVALID_NAME;
+		vec_add(files, name);
+		continue;
+		INVALID_NAME:
+		if (file_is_dir(name))
+		{
+			file_add_wildcard_files(&files, name, true, suffix_list, suffix_count);
+			continue;
+		}
+		if (!error_on_mismatch) continue;
+		error_exit("File names must be a non-empty name followed by %s or they cannot be compiled: '%s' is invalid.", suffix_list[0], name);
+	}
+	return files;
+}
+
 
 #define BUFSIZE 1024
 const char *execute_cmd(const char *cmd, bool ignore_failure, const char *stdin_string)

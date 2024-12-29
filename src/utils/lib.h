@@ -38,8 +38,7 @@ typedef struct
 } MacSDK;
 
 typedef struct {
-	char* windows_sdk_um_library_path;
-	char* windows_sdk_ucrt_library_path;
+	char* windows_sdk_path;
 	char* vs_library_path;
 } WindowsSDK;
 
@@ -49,7 +48,7 @@ NORETURN void exit_compiler(int exit_value);
 extern jmp_buf on_err_jump;
 
 extern bool debug_log;
-extern bool debug_stats;
+
 extern uintptr_t arena_zero;
 struct ScratchBuf { char str[MAX_STRING_BUFFER]; uint32_t len; };
 extern struct ScratchBuf scratch_buffer;
@@ -89,6 +88,8 @@ bool file_has_suffix_in_list(const char *file_name, int name_len, const char **s
 void file_add_wildcard_files(const char ***files, const char *path, bool recursive, const char **suffix_list, int suffix_count);
 const char *file_append_path(const char *path, const char *name);
 const char *file_append_path_temp(const char *path, const char *name);
+
+const char **target_expand_source_names(const char *base_dir, const char** dirs, const char **suffix_list, const char ***object_list_ref, int suffix_count, bool error_on_mismatch);
 
 const char *execute_cmd(const char *cmd, bool ignore_failure, const char *stdin_string);
 
@@ -161,6 +162,7 @@ void scratch_buffer_append_len(const char *string, size_t len);
 void scratch_buffer_append_char(char c);
 void scratch_buffer_append_in_quote(const char *string);
 void scratch_buffer_append_char_repeat(char c, size_t count);
+void scratch_buffer_append_remove_space(const char *start, int len);
 void scratch_buffer_append_signed_int(int64_t i);
 void scratch_buffer_append_double(double d);
 void scratch_buffer_append_shell_escaped(const char *string);
@@ -253,8 +255,8 @@ typedef struct
 
 static inline VHeader_* vec_new_(size_t element_size, size_t capacity)
 {
-	assert(capacity < UINT32_MAX);
-	assert(element_size < UINT32_MAX / 100);
+	ASSERT0(capacity < UINT32_MAX);
+	ASSERT0(element_size < UINT32_MAX / 100);
 	VHeader_ *header = CALLOC(element_size * capacity + sizeof(VHeader_));
 	header->capacity = (uint32_t)capacity;
 	return header;
@@ -271,8 +273,8 @@ static inline void vec_resize(void *vec, uint32_t new_size)
 
 static inline void vec_pop(void *vec)
 {
-	assert(vec);
-	assert(vec_size(vec) > 0);
+	ASSERT0(vec);
+	ASSERT0(vec_size(vec) > 0);
 	VHeader_ *header = vec;
 	header[-1].size--;
 }
@@ -280,9 +282,9 @@ static inline void vec_pop(void *vec)
 static inline void vec_erase_front(void  *vec, unsigned to_erase)
 {
 	if (!to_erase) return;
-	assert(vec);
+	ASSERT0(vec);
 	unsigned size = vec_size(vec);
-	assert(size >= to_erase);
+	ASSERT0(size >= to_erase);
 	void **vecptr = (void**)vec;
 	for (int i = to_erase; i < size; i++)
 	{
@@ -294,9 +296,9 @@ static inline void vec_erase_front(void  *vec, unsigned to_erase)
 
 static inline void vec_erase_at(void *vec, unsigned i)
 {
-	assert(vec);
+	ASSERT0(vec);
 	unsigned size = vec_size(vec);
-	assert(size > i);
+	ASSERT0(size > i);
 	void **vecptr = (void**)vec;
 	for (int j = i + 1; j < size; j++)
 	{

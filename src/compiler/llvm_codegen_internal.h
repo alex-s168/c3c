@@ -52,9 +52,11 @@ typedef struct DebugScope_
 
 typedef struct
 {
-	unsigned runtime_version : 8;
-	bool enable_stacktrace : 1;
+	bool enable_stacktrace;
+	bool emit_expr_loc;
+	unsigned runtime_version;
 	LLVMDIBuilderRef builder;
+
 	DebugFile *debug_files;
 	DebugFile file;
 	LLVMMetadataRef compile_unit;
@@ -310,7 +312,7 @@ LLVMBuilderRef llvm_create_builder(GenContext *c);
 
 static inline LLVMValueRef decl_optional_ref(Decl *decl)
 {
-	assert(decl->decl_kind == DECL_VAR);
+	ASSERT0(decl->decl_kind == DECL_VAR);
 	if (decl->var.kind == VARDECL_UNWRAPPED) return decl_optional_ref(decl->var.alias);
 	if (decl->type->type_kind != TYPE_OPTIONAL) return NULL;
 	return decl->var.optional_ref;
@@ -369,6 +371,7 @@ void llvm_set_linkonce(GenContext *c, LLVMValueRef global);
 void llvm_set_comdat(GenContext *c, LLVMValueRef global);
 void llvm_set_private_declaration(LLVMValueRef alloc);
 void llvm_set_decl_linkage(GenContext *c, Decl *decl);
+void llvm_set_weak(GenContext *c, LLVMValueRef global);
 
 void llvm_set_internal_linkage(LLVMValueRef alloc);
 void llvm_set_global_tls(Decl *decl);
@@ -529,7 +532,7 @@ LLVMValueRef llvm_emit_expect_raw(GenContext *c, LLVMValueRef expect_true);
 LLVMValueRef llvm_emit_expect_false(GenContext *c, BEValue *expect_false);
 void llvm_emit_any_from_value(GenContext *c, BEValue *value, Type *type);
 void llvm_emit_slice_len(GenContext *c, BEValue *slice, BEValue *len);
-void llvm_emit_slice_pointer(GenContext *context, BEValue *slice, BEValue *pointer);
+void llvm_emit_slice_pointer(GenContext *c, BEValue *slice, BEValue *pointer);
 void llvm_emit_compound_stmt(GenContext *c, Ast *ast);
 LLVMValueRef llvm_emit_const_bitstruct(GenContext *c, ConstInitializer *initializer);
 void llvm_emit_function_body(GenContext *context, Decl *decl);
@@ -574,6 +577,7 @@ void llvm_emit_debug_local_var(GenContext *c, Decl *var);
 
 #define UWTABLE (compiler.build.arch_os_target == MACOS_AARCH64 ? 1 : 2)
 #define EMIT_LOC(c, x) do { if (c->debug.builder) llvm_emit_debug_location(c, x->span); } while (0)
+#define EMIT_EXPR_LOC(c, x) do { if (c->debug.builder) llvm_emit_debug_location(c, x->span); } while (0)
 #define EMIT_SPAN(c, x) do { if (c->debug.builder) llvm_emit_debug_location(c, x); } while (0)
 #define PUSH_DEFER_ERROR(val__) LLVMValueRef def_err__ = c->defer_error_var; c->defer_error_var = val__
 #define POP_DEFER_ERROR() c->defer_error_var = def_err__

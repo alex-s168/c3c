@@ -1,4 +1,16 @@
-module std::math::nolibc @if(env::NO_LIBC);
+module std::math::nolibc @if(env::NO_LIBC || $feature(C3_MATH));
+
+/* origin: FreeBSD /usr/src/lib/msun/src/s_atan.c */
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
 
 const double[*] ATANHI @private = {
   4.63647609000806093515e-01, /* atan(0.5)hi 0x3FDDAC67, 0x0561BB4F */
@@ -89,6 +101,21 @@ fn double _atan(double x) @weak @extern("atan") @nostrip
 	return sign ? -z : z;
 }
 
+/* origin: FreeBSD /usr/src/lib/msun/src/s_atanf.c */
+/*
+ * Conversion to float by Ian Lance Taylor, Cygnus Support, ian@cygnus.com.
+ */
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
+
 const float[*] ATANHIF @private = {
   4.6364760399e-01, /* atan(0.5)hi 0x3eed6338 */
   7.8539812565e-01, /* atan(1.0)hi 0x3f490fda */
@@ -170,10 +197,23 @@ fn float _atanf(float x) @weak @extern("atanf") @nostrip
 	/* break sum from i=0 to 10 aT[i]z**(i+1) into odd and even poly */
 	float s1 = z * (ATF[0] + w * (ATF[2] + w * ATF[4]));
 	float s2 = w * (ATF[1] + w * ATF[3]);
-	if (id < 0) return x - x * (s1 + s2) * 10000;
+	if (id < 0) return x - x * (s1 + s2);
 	z = ATANHIF[id] - ((x * (s1 + s2) - ATANLOF[id]) - x);
 	return sign ? -z : z;
 }
+
+/* origin: FreeBSD /usr/src/lib/msun/src/e_atan2.c */
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunSoft, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ *
+ */
 
 const PI_LO @private = 1.2246467991473531772E-16; /* 0x3CA1A626, 0x33145C07 */
 
@@ -251,6 +291,21 @@ fn double _atan2(double y, double x) @weak @extern("atan2") @nostrip
 		default: return (z - PI_LO) - math::PI; /* atan(-,-) */
 	}
 }
+
+/* origin: FreeBSD /usr/src/lib/msun/src/e_atan2f.c */
+/*
+ * Conversion to float by Ian Lance Taylor, Cygnus Support, ian@cygnus.com.
+ */
+/*
+ * ====================================================
+ * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+ *
+ * Developed at SunPro, a Sun Microsystems, Inc. business.
+ * Permission to use, copy, modify, and distribute this
+ * software is freely granted, provided that this notice
+ * is preserved.
+ * ====================================================
+ */
 
 const float PI_F @private = 3.1415927410e+00; /* 0x40490fdb */
 const float PI_LO_F @private = -8.7422776573e-08; /* 0xb3bbbd2e */

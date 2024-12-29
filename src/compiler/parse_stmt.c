@@ -53,7 +53,7 @@ static Ast *parse_decl_stmt_after_type(ParseContext *c, TypeInfo *type)
 			}
 			if (decl->attributes)
 			{
-				assert(VECLAST(decl->attributes));
+				ASSERT0(VECLAST(decl->attributes));
 				PRINT_ERROR_AT(VECLAST(decl->attributes), "Multiple variable declarations must have attributes at the end.");
 				return poisoned_ast;
 			}
@@ -76,7 +76,7 @@ static Ast *parse_decl_stmt_after_type(ParseContext *c, TypeInfo *type)
 		{
 			if (tok_is(c, TOKEN_COMMA))
 			{
-				assert(VECLAST(decl->attributes));
+				ASSERT0(VECLAST(decl->attributes));
 				PRINT_ERROR_AT(VECLAST(decl->attributes), "Multiple variable declarations must have attributes at the end.");
 				return poisoned_ast;
 			}
@@ -171,7 +171,7 @@ static inline bool parse_asm_offset(ParseContext *c, ExprAsmArg *asm_arg)
 		return false;
 	}
 	Expr *offset = parse_integer(c, NULL);
-	assert(expr_is_const_int(offset));
+	ASSERT0(expr_is_const_int(offset));
 	Int i = offset->const_expr.ixx;
 	if (i.i.high)
 	{
@@ -190,7 +190,7 @@ static inline bool parse_asm_scale(ParseContext *c, ExprAsmArg *asm_arg)
 		return false;
 	}
 	Expr *value = parse_integer(c, NULL);
-	assert(expr_is_const_int(value));
+	ASSERT0(expr_is_const_int(value));
 	Int i = value->const_expr.ixx;
 	if (i.i.high)
 	{
@@ -380,6 +380,14 @@ static inline Expr *parse_asm_expr(ParseContext *c)
 static inline Ast *parse_asm_stmt(ParseContext *c)
 {
 	Ast *asm_stmt = ast_new_curr(c, AST_ASM_STMT);
+	if (tok_is(c, TOKEN_CONST_IDENT))
+	{
+		asm_stmt->asm_label = symstr(c);
+		advance_and_verify(c, TOKEN_CONST_IDENT);
+		asm_stmt->ast_kind = AST_ASM_LABEL;
+		TRY_CONSUME_OR_RET(TOKEN_COLON, "Expected a ':' to terminate the label.", poisoned_ast);
+		return asm_stmt;
+	}
 	if (!tok_is(c, TOKEN_IDENT) && !tok_is(c, TOKEN_INT))
 	{
 		PRINT_ERROR_HERE("Expected an asm instruction here.");

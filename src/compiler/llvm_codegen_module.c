@@ -57,7 +57,7 @@ static void llvm_set_module_flag(GenContext *c, LLVMModuleFlagBehavior flag_beha
 
 void gencontext_begin_module(GenContext *c)
 {
-	assert(!c->module && "Expected no module");
+	ASSERT0(!c->module && "Expected no module");
 
 	codegen_setup_object_names(c->code_module, &c->ir_filename, &c->asm_filename, &c->object_filename);
 
@@ -70,26 +70,6 @@ void gencontext_begin_module(GenContext *c)
 
 	LLVMSetModuleDataLayout(c->module, c->target_data);
 	LLVMSetSourceFileName(c->module, c->code_module->name->module, strlen(c->code_module->name->module));
-
-	static const char *pic_level = "PIC Level";
-	static const char *pie_level = "PIE Level";
-	switch (compiler.platform.reloc_model)
-	{
-		case RELOC_BIG_PIE:
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pie_level, (unsigned)2 /* PIE */, type_uint);
-			FALLTHROUGH;
-		case RELOC_BIG_PIC:
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pic_level, (unsigned)2 /* PIC */, type_uint);
-			break;
-		case RELOC_SMALL_PIE:
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pie_level, (unsigned)1 /* pie */, type_uint);
-			FALLTHROUGH;
-		case RELOC_SMALL_PIC:
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pic_level, (unsigned)1 /* pic */, type_uint);
-			break;
-		default:
-			break;
-	}
 
 	LLVMSetTarget(c->module, compiler.platform.target_triple);
 
@@ -146,28 +126,56 @@ void gencontext_begin_module(GenContext *c)
 	c->memcmp_function_type = LLVMFunctionType(llvm_get_type(c, type_cint), memcmp_types, 3, false);
 	if (c->panic_var) c->panic_var->backend_ref = NULL;
 	if (c->panicf) c->panicf->backend_ref = NULL;
+	bool is_win = compiler.build.arch_os_target == WINDOWS_X64 || compiler.build.arch_os_target == WINDOWS_AARCH64;
+	if (is_win)
+	{
+		llvm_set_module_flag(c, LLVMModuleFlagBehaviorError, "CodeView", 1, type_uint);
+	}
+	else
+	{
+		llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "Dwarf Version", 4, type_uint);
+	}
+	llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "Debug Info Version", 3, type_uint);
+	llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "wchar_size", is_win ? 2 : 4, type_uint);
+	static const char *pic_level = "PIC Level";
+	static const char *pie_level = "PIE Level";
+	switch (compiler.platform.reloc_model)
+	{
+		case RELOC_BIG_PIE:
+			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pie_level, (unsigned)2 /* PIE */, type_uint);
+			FALLTHROUGH;
+		case RELOC_BIG_PIC:
+			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pic_level, (unsigned)2 /* PIC */, type_uint);
+			break;
+		case RELOC_SMALL_PIE:
+			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pie_level, (unsigned)1 /* pie */, type_uint);
+			FALLTHROUGH;
+		case RELOC_SMALL_PIC:
+			llvm_set_module_flag(c, LLVMModuleFlagBehaviorOverride, pic_level, (unsigned)1 /* pic */, type_uint);
+			break;
+		default:
+			break;
+	}
+	llvm_set_module_flag(c, LLVMModuleFlagBehaviorError, "uwtable", UWTABLE, type_uint);
+	if (is_win)
+	{
+		llvm_set_module_flag(c, LLVMModuleFlagBehaviorError, "MaxTLSAlign", 65536, type_uint);
+	}
+	else
+	{
+		unsigned frame_pointer = compiler.platform.arch == ARCH_TYPE_AARCH64 ? 1 : 2;
+		llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "frame-pointer", frame_pointer, type_uint);
+	}
 
 	if (compiler.build.debug_info != DEBUG_INFO_NONE)
 	{
-		if (compiler.build.arch_os_target == WINDOWS_X64 || compiler.build.arch_os_target == WINDOWS_AARCH64)
-		{
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorError, "CodeView", 1, type_uint);
-		}
-		else
-		{
-			unsigned frame_pointer = compiler.platform.arch == ARCH_TYPE_AARCH64 ? 1 : 2;
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "Dwarf Version", 4, type_uint);
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "Debug Info Version", 3, type_uint);
-			llvm_set_module_flag(c, LLVMModuleFlagBehaviorWarning, "frame-pointer", frame_pointer, type_uint);
-		}
-		llvm_set_module_flag(c, LLVMModuleFlagBehaviorError, "uwtable", UWTABLE, type_uint);
-
 		c->debug.runtime_version = 0;
 		c->debug.builder = LLVMCreateDIBuilder(c->module);
 		if (compiler.build.debug_info == DEBUG_INFO_FULL && safe_mode_enabled())
 		{
 			c->debug.enable_stacktrace = os_supports_stacktrace(compiler.platform.os);
 		}
+		c->debug.emit_expr_loc = !is_win;
 	}
 	c->global_builder = LLVMCreateBuilder();
 	c->builder = c->global_builder;

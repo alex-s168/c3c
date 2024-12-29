@@ -51,7 +51,7 @@ jobs:
         run: |
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
           cd resources/testproject
-          ..\..\build\${{ matrix.build_type }}\c3c.exe --debug-log --emit-llvm run hello_world_win32
+          ..\..\build\${{ matrix.build_type }}\c3c.exe -vvv --emit-llvm run hello_world_win32
           dir build\llvm_ir
           ..\..\build\${{ matrix.build_type }}\c3c.exe clean
           dir build\llvm_ir
@@ -61,13 +61,19 @@ jobs:
         run: |
           cd resources/testproject
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" x64
-          ..\..\build\${{ matrix.build_type }}\c3c.exe --debug-log build hello_world_win32_lib
+          ..\..\build\${{ matrix.build_type }}\c3c.exe -vvv build hello_world_win32_lib
 
       - name: Compile and run dynlib-test
         run: |
           cd resources/examples/dynlib-test
-          ..\..\..\build\${{ matrix.build_type }}\c3c.exe dynamic-lib add.c3
-          ..\..\..\build\${{ matrix.build_type }}\c3c.exe compile-run test.c3 -l ./add.lib          
+          ..\..\..\build\${{ matrix.build_type }}\c3c.exe -vv dynamic-lib add.c3
+          ..\..\..\build\${{ matrix.build_type }}\c3c.exe -vv compile-run test.c3 -l ./add.lib          
+
+      - name: Compile and run staticlib-test
+        run: |
+          cd resources/examples/staticlib-test
+          ..\..\..\build\${{ matrix.build_type }}\c3c.exe -vv static-lib add.c3
+          ..\..\..\build\${{ matrix.build_type }}\c3c.exe -vv compile-run test.c3 -l ./add.lib          
 
       - name: Vendor-fetch
         run: |
@@ -126,8 +132,8 @@ jobs:
           install: git binutils mingw-w64-x86_64-clang mingw-w64-x86_64-ninja mingw-w64-x86_64-cmake mingw-w64-x86_64-toolchain mingw-w64-x86_64-python
       - shell: msys2 {0}
         run: |
-            pacman --noconfirm -U https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-18.1.8-1-any.pkg.tar.zst
-            pacman --noconfirm -U https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-lld-18.1.8-1-any.pkg.tar.zst
+            pacman --noconfirm -U https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-llvm-19.1.6-1-any.pkg.tar.zst
+            pacman --noconfirm -U https://mirror.msys2.org/mingw/mingw64/mingw-w64-x86_64-lld-19.1.6-1-any.pkg.tar.zst
       - name: CMake
         run: |
           cmake -B build -G Ninja -DCMAKE_C_COMPILER=clang -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
@@ -147,7 +153,7 @@ jobs:
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Vendor-fetch
         run: |
@@ -156,7 +162,7 @@ jobs:
       - name: Build testproject lib
         run: |
           cd resources/testproject
-          ../../build/c3c build hello_world_lib --cc cc --debug-log
+          ../../build/c3c build hello_world_lib --cc cc -vvv
 
       - name: run compiler tests
         run: |
@@ -203,12 +209,12 @@ jobs:
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Build testproject lib
         run: |
           cd resources/testproject
-          ../../build/c3c build hello_world_lib --debug-log
+          ../../build/c3c build hello_world_lib -vvv
 
       - name: run compiler tests
         run: |
@@ -222,7 +228,7 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Release, Debug]
-        llvm_version: [17, 18, 19, 20]
+        llvm_version: [17, 18, 19]
 
     steps:
       - uses: actions/checkout@v4
@@ -320,11 +326,20 @@ jobs:
       - name: Compile and run dynlib-test
         run: |
           cd resources/examples/dynlib-test
-          ../../../build/c3c dynamic-lib add.c3
+          ../../../build/c3c -vv dynamic-lib add.c3
           mv add.so libadd.so
           cc test.c -L. -ladd -Wl,-rpath=.         
           ./a.out
           ../../../build/c3c compile-run test.c3 -L . -l add -z -Wl,-rpath=.           
+
+      - name: Compile and run staticlib-test
+        run: |
+          cd resources/examples/staticlib-test
+          ../../../build/c3c -vv static-lib add.c3
+          mv add.a libadd.a
+          cc test.c -L. -ladd         
+          ./a.out
+          ../../../build/c3c compile-run test.c3 -L . -l add           
 
       - name: Compile run unit tests
         run: |
@@ -334,7 +349,7 @@ jobs:
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Test WASM
         run: |
@@ -353,7 +368,7 @@ jobs:
       - name: Build testproject direct linker
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log --linker=builtin
+          ../../build/c3c run -vvv --linker=builtin
 
       - name: Init a library & a project
         run: |
@@ -390,7 +405,7 @@ jobs:
       fail-fast: false
       matrix:
         build_type: [Release, Debug]
-        llvm_version: [17, 18, 19, 20]
+        llvm_version: [17, 18, 19]
     steps:
       - uses: actions/checkout@v4
       - name: Install common deps
@@ -476,12 +491,12 @@ jobs:
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Build testproject direct linker
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log --linker=builtin
+          ../../build/c3c run -vvv --linker=builtin
 
       - name: run compiler tests
         run: |
@@ -511,7 +526,7 @@ jobs:
       matrix:
         ubuntu_version: [20.04, 22.04]
         build_type: [Release, Debug]
-        llvm_version: [17, 18, 19, 20]
+        llvm_version: [17, 18, 19]
 
     steps:
       - uses: actions/checkout@v4
@@ -568,7 +583,7 @@ jobs:
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Test WASM
         run: |
@@ -578,7 +593,7 @@ jobs:
       - name: Build testproject direct linker
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log --linker=builtin
+          ../../build/c3c run -vvv --linker=builtin
 
       - name: Init a library & a project
         run: |
@@ -639,7 +654,7 @@ jobs:
       - name: Compile and run dynlib-test
         run: |
           cd resources/examples/dynlib-test
-          ../../../build/c3c dynamic-lib add.c3
+          ../../../build/c3c -vv dynamic-lib add.c3
           ../../../build/c3c compile-run test.c3 -l ./add.dylib          
 
       - name: Compile run unit tests
@@ -647,20 +662,25 @@ jobs:
           cd test
           ../build/c3c compile-test unit
 
+      - name: Test WASM
+        run: |
+          cd resources/testfragments
+          ../../build/c3c compile --target wasm32 -g0 --no-entry -Os wasm4.c3
+
       - name: Build testproject
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log
+          ../../build/c3c run -vvv
 
       - name: Build testproject direct linker
         run: |
           cd resources/testproject
-          ../../build/c3c run --debug-log --linker=builtin
+          ../../build/c3c run -vvv --linker=builtin
 
       - name: Build testproject lib
         run: |
           cd resources/testproject
-          ../../build/c3c build hello_world_lib --debug-log
+          ../../build/c3c build hello_world_lib -vvv
 
       - name: run compiler tests
         run: |

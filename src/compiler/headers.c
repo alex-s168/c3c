@@ -46,7 +46,7 @@ INLINE bool header_try_gen_both(HeaderContext *c, Type *type)
 	if (header_try_gen_definition(c, type))
 	{
 		bool success = header_try_gen_decl(c, type);
-		assert(success);
+		ASSERT0(success);
 		return true;
 	}
 	return false;
@@ -91,7 +91,7 @@ static void header_print_type(HeaderContext *c, Type *type)
 		PRINTF("%s", decl_get_extname(type->decl));
 		return;
 	}
-	assert(!type_is_optional(type));
+	ASSERT0(!type_is_optional(type));
 	switch (type->type_kind)
 	{
 		case CT_TYPES:
@@ -275,7 +275,8 @@ static void header_gen_function_ptr(HeaderContext *c, Type *type)
 static void header_gen_function(HeaderContext *c, Decl *decl, bool print_fn, bool* fn_found)
 {
 	if (!decl->is_export) return;
-	if (decl->extname[0] == '_' && decl->extname[1] == '_') return;
+	const char *ext_name = decl_get_extname(decl);
+	if (ext_name[0] == '_' && ext_name[1] == '_') return;
 	if (print_fn && !*fn_found)
 	{
 		*fn_found = true;
@@ -581,7 +582,7 @@ RETRY:
 
 static void header_gen_global_var(HeaderContext *c, Decl *decl, bool fn_globals, bool *globals_found)
 {
-	assert(decl->decl_kind == DECL_VAR);
+	ASSERT0(decl->decl_kind == DECL_VAR);
 	// Only exports.
 	if (!decl->is_export) return;
 	Type *type = decl->type->canonical;
@@ -613,7 +614,7 @@ static void header_gen_global_var(HeaderContext *c, Decl *decl, bool fn_globals,
 		Type *flat = type_flatten(type);
 		if (type_is_arraylike(flat) || type_is_user_defined(flat) || !init) return;
 		PRINTF("#define %s ", decl_get_extname(decl));
-		assert(expr_is_const(init));
+		ASSERT0(expr_is_const(init));
 		switch (init->const_expr.const_kind)
 		{
 			case CONST_INTEGER:
@@ -669,7 +670,7 @@ static void header_gen_global_var(HeaderContext *c, Decl *decl, bool fn_globals,
 		return;
 	}
 	header_print_type(c, decl->type);
-	assert(decl->var.kind == VARDECL_GLOBAL || decl->var.kind == VARDECL_CONST);
+	ASSERT0(decl->var.kind == VARDECL_GLOBAL || decl->var.kind == VARDECL_CONST);
 	PRINTF("extern ");
 	if (decl->var.kind == VARDECL_CONST) PRINTF("const ");
 	PRINTF(" %s;\n", decl_get_extname(decl));

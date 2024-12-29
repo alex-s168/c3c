@@ -23,7 +23,7 @@ void scratch_buffer_append_module(Module *module, bool is_export)
 		switch (c)
 		{
 			case ':':
-				assert(name[0] == ':');
+				ASSERT0(name[0] == ':');
 				scratch_buffer_append_char(is_export ? '_' : '.');
 				name++;
 				break;
@@ -43,7 +43,11 @@ void scratch_buffer_append_module(Module *module, bool is_export)
 
 const char *module_create_object_file_name(Module *module)
 {
-	if (compiler.build.single_module == SINGLE_MODULE_ON && compiler.build.name) return compiler.build.name;
+	if (compiler.build.single_module == SINGLE_MODULE_ON)
+	{
+		if (compiler.build.output_name) return compiler.build.output_name;
+		if (compiler.build.name) return compiler.build.name;
+	}
 	scratch_buffer_clear();
 	char c;
 	const char *name = module->name->module;
@@ -75,7 +79,7 @@ const char *module_create_object_file_name(Module *module)
 
 Path *path_create_from_string(const char *string, uint32_t len, SourceSpan span)
 {
-	assert(string);
+	ASSERT0(string);
 	Path *path = CALLOCS(Path);
 	path->span = span;
 	TokenType type = TOKEN_IDENT;

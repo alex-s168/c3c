@@ -1,4 +1,4 @@
-module std::math::nolibc @if(env::NO_LIBC);
+module std::math::nolibc @if(env::NO_LIBC || $feature(C3_MATH));
 
 fn float _cosf(float x) @extern("cosf") @weak @nostrip
 {
@@ -51,7 +51,7 @@ fn float _cosf(float x) @extern("cosf") @weak @nostrip
  * ====================================================
  */
 
-fn double _cos(double x) @weak @nostrip
+fn double _cos(double x) @extern("cos")  @weak @nostrip
 {
 	// High word of x.
 	uint ix = (uint)(bitcast(x, ulong) >> 32);

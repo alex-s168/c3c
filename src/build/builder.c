@@ -73,7 +73,6 @@ bool command_accepts_files(CompilerCommand command)
 		case COMMAND_UNIT_TEST:
 			return true;
 		case COMMAND_MISSING:
-		case COMMAND_GENERATE_HEADERS:
 		case COMMAND_INIT:
 		case COMMAND_INIT_LIB:
 		case COMMAND_BUILD:
@@ -109,7 +108,6 @@ bool command_passes_args(CompilerCommand command)
 		case COMMAND_COMPILE_TEST:
 		case COMMAND_UNIT_TEST:
 		case COMMAND_MISSING:
-		case COMMAND_GENERATE_HEADERS:
 		case COMMAND_INIT:
 		case COMMAND_INIT_LIB:
 		case COMMAND_BUILD:
@@ -297,6 +295,7 @@ static void update_build_target_from_options(BuildTarget *target, BuildOptions *
 			break;
 		case COMMAND_STATIC_LIB:
 			target->type = TARGET_TYPE_STATIC_LIB;
+			target->single_module = true;
 			break;
 		default:
 			target->run_after_compile = false;
@@ -308,7 +307,8 @@ static void update_build_target_from_options(BuildTarget *target, BuildOptions *
 		case COMMAND_BUILD:
 			target->output_headers = (target->type == TARGET_TYPE_DYNAMIC_LIB || target->type == TARGET_TYPE_STATIC_LIB) && !options->no_headers;
 			break;
-		case COMMAND_GENERATE_HEADERS:
+		case COMMAND_STATIC_LIB:
+		case COMMAND_DYNAMIC_LIB:
 			target->output_headers = true;
 			break;
 		default:
@@ -363,8 +363,8 @@ static void update_build_target_from_options(BuildTarget *target, BuildOptions *
 	if (options->arch_os_target_override != ARCH_OS_TARGET_DEFAULT) target->arch_os_target = options->arch_os_target_override;
 	if (options->reloc_model != RELOC_DEFAULT) target->reloc_model = options->reloc_model;
 	if (options->symtab_size) target->symtab_size = options->symtab_size;
-	if (options->silence_deprecation) target->silence_deprecation = options->silence_deprecation;
-	target->print_linking = options->print_linking;
+	if (options->silence_deprecation) target->silence_deprecation = options->silence_deprecation || options->verbosity_level < 0;
+	target->print_linking = options->print_linking || options->verbosity_level > 1;
 
 	for (size_t i = 0; i < options->linker_arg_count; i++)
 	{
@@ -394,15 +394,18 @@ static void update_build_target_from_options(BuildTarget *target, BuildOptions *
 	target->emit_llvm = options->emit_llvm;
 	target->build_threads = options->build_threads;
 	target->emit_asm = options->emit_asm;
+	target->print_stats = options->verbosity_level >= 2;
 	if (options->output_dir) target->output_dir = options->output_dir;
 	if (options->panicfn) target->panicfn = options->panicfn;
 	if (options->testfn) target->testfn = options->testfn;
 	if (options->benchfn) target->benchfn = options->benchfn;
 	target->benchmarking = options->benchmarking;
 	target->testing = options->testing;
+	target->silent = options->verbosity_level < 0;
 	target->vector_conv = options->vector_conv;
 	if (options->macos.sysroot) target->macos.sysroot = options->macos.sysroot;
 	if (options->win.sdk) target->win.sdk = options->win.sdk;
+	if (options->win.vs_dirs) target->win.vs_dirs = options->win.vs_dirs;
 	if (options->macos.min_version) target->macos.min_version = options->macos.min_version;
 	if (options->macos.sdk_version) target->macos.sdk_version = options->macos.sdk_version;
 	if (options->win.crt_linking != WIN_CRT_DEFAULT) target->win.crt_linking = options->win.crt_linking;
@@ -518,6 +521,7 @@ void init_default_build_target(BuildTarget *target, BuildOptions *options)
 	*target = default_build_target;
 	target->source_dirs = options->files;
 	target->name = options->output_name;
+	target->output_name = options->output_name;
 	update_build_target_from_options(target, options);
 }
 

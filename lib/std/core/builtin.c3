@@ -4,20 +4,21 @@
 module std::core::builtin;
 import libc, std::hash, std::io, std::os::backtrace;
 
-<*
+/*
  Use `IteratorResult` when reading the end of an iterator, or accessing a result out of bounds.
-*>
+*/
 fault IteratorResult { NO_MORE_ELEMENT }
 
-<*
+/*
  Use `SearchResult` when trying to return a value from some collection but the element is missing.
-*>
+*/
 fault SearchResult { MISSING }
 
-<*
+/*
  Use `CastResult` when an attempt at conversion fails.
-*>
+*/
 fault CastResult { TYPE_MISMATCH }
+
 
 def VoidFn = fn void();
 
@@ -229,7 +230,25 @@ macro enum_by_name($Type, String enum_name) @builtin
 	typeid x = $Type.typeid;
 	foreach (i, name : x.names)
 	{
-		if (name == enum_name) return ($Type)i;
+		if (name == enum_name) return $Type.from_ordinal(i);
+	}
+	return SearchResult.MISSING?;
+}
+
+<*
+ @param $Type `The type of the enum`
+ @require $Type.kindof == ENUM `Only enums may be used`
+ @require $defined($Type.#value1) `Expected '#value' to match an enum associated value`
+ @require $assignable(value, $typeof($Type{}.#value)) `Expected the value to match the type of the associated value`
+ @ensure @typeis(return, $Type)
+ @return! SearchResult.MISSING
+*>
+macro @enum_from_value($Type, #value, value) @builtin
+{
+	usz elements = $Type.elements;
+	foreach (e : $Type.values)
+	{
+		if (e.#value == value) return e;
 	}
 	return SearchResult.MISSING?;
 }

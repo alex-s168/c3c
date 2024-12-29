@@ -224,7 +224,7 @@ enum AtomicOrdering : int
 *>
 macro @atomic_load(&x, AtomicOrdering $ordering = SEQ_CONSISTENT, $volatile = false) @builtin
 {
-	return $$atomic_load(x, $volatile, (int)$ordering);
+	return $$atomic_load(x, $volatile, $ordering.ordinal);
 }
 
 <*
@@ -239,7 +239,7 @@ macro @atomic_load(&x, AtomicOrdering $ordering = SEQ_CONSISTENT, $volatile = fa
 *>
 macro void @atomic_store(&x, value, AtomicOrdering $ordering = SEQ_CONSISTENT, $volatile = false) @builtin
 {
-	$$atomic_store(x, value, $volatile, (int)$ordering);
+	$$atomic_store(x, value, $volatile, $ordering.ordinal);
 }
 
 <*
@@ -455,19 +455,23 @@ macro void @scoped(Allocator allocator; @body())
 <*
  Run the tracking allocator in the scope, then
  print out stats.
+
+ @param $enabled "Set to false to disable tracking"
 *>
-macro void @report_heap_allocs_in_scope(;@body())
+macro void @report_heap_allocs_in_scope($enabled = true; @body())
 {
-	TrackingAllocator tracker;
-	tracker.init(allocator::thread_allocator);
-	Allocator old_allocator = allocator::thread_allocator;
-	allocator::thread_allocator = &tracker;
-	defer
-	{
-		allocator::thread_allocator = old_allocator;
-		tracker.print_report();
-		tracker.free();
-	}
+	$if $enabled:
+		TrackingAllocator tracker;
+		tracker.init(allocator::thread_allocator);
+		Allocator old_allocator = allocator::thread_allocator;
+		allocator::thread_allocator = &tracker;
+		defer
+		{
+			allocator::thread_allocator = old_allocator;
+			tracker.print_report();
+			tracker.free();
+		}
+	$endif
 	@body();
 }
 
@@ -772,5 +776,43 @@ fn void* trealloc(void* ptr, usz size, usz alignment = mem::DEFAULT_MEM_ALIGNMEN
 	if (!size) return null;
 	if (!ptr) return tmalloc(size, alignment);
 	return allocator::temp().resize(ptr, size, alignment)!!;
+}
+
+module std::core::mem @if(env::NO_LIBC);
+
+fn CInt __memcmp(void* s1, void* s2, usz n) @weak @export("memcmp")
+{
+	char* p1 = s1;
+	char* p2 = s2;
+	for (usz i = 0; i < n; i++, p1++, p2++)
+	{
+		char c1 = *p1;
+		char c2 = *p2;
+		if (c1 < c2) return -1;
+		if (c1 > c2) return 1;
+	}
+	return 0;
+}
+
+fn void* __memset(void* str, CInt c, usz n) @weak @export("memset")
+{
+	char* p = str;
+	char cc = (char)c;
+	for (usz i = 0; i < n; i++, p++)
+	{
+		*p = cc;
+	}
+	return str;
+}
+
+fn void* __memcpy(void* dst, void* src, usz n) @weak @export("memcpy")
+{
+	char* d = dst;
+	char* s = src;
+	for (usz i = 0; i < n; i++, d++, s++)
+	{
+		*d = *s;
+	}
+	return dst;
 }
 

@@ -61,7 +61,7 @@ static inline void backtrack(Lexer *lexer)
 // Skip the x next characters.
 static inline void skip(Lexer *lexer, int steps)
 {
-	assert(steps > 0);
+	ASSERT0(steps > 0);
 	for (int i = 0; i < steps; i++)
 	{
 		next(lexer);
@@ -370,6 +370,11 @@ static inline bool scan_ident(Lexer *lexer, TokenType normal, TokenType const_to
  */
 static bool scan_number_suffix(Lexer *lexer, bool *is_float)
 {
+	if (prev(lexer) == '_')
+	{
+		backtrack(lexer);
+		return add_error_token_at_current(lexer, "The number ended with '_', which isn't allowed, please remove it.");
+	}
 	char c = peek(lexer);
 	if (!char_is_alphanum_(c)) return true;
 	switch (c | 32)
@@ -535,11 +540,6 @@ static inline bool scan_hex(Lexer *lexer)
 		is_float = true;
 		if (!scan_exponent(lexer)) return false;
 	}
-	if (prev(lexer) == '_')
-	{
-		backtrack(lexer);
-		return add_error_token_at_current(lexer, "The number ended with '_', which isn't allowed, please remove it.");
-	}
 	if (!scan_number_suffix(lexer, &is_float)) return false;
 	return new_token(lexer, is_float ? TOKEN_REAL : TOKEN_INTEGER, lexer->lexing_start);
 }
@@ -549,7 +549,7 @@ static inline bool scan_hex(Lexer *lexer)
  */
 static inline bool scan_dec(Lexer *lexer)
 {
-	assert(char_is_digit(peek(lexer)));
+	ASSERT0(char_is_digit(peek(lexer)));
 
 	// Walk through the digits, we don't need to worry about
 	// initial _ because we only call this if we have a digit initially.
@@ -580,12 +580,6 @@ static inline bool scan_dec(Lexer *lexer)
 	{
 		is_float = true;
 		if (!scan_exponent(lexer)) return false;
-	}
-
-	if (prev(lexer) == '_')
-	{
-		backtrack(lexer);
-		return add_error_token_at_current(lexer, "The number ended with '_', which isn't allowed, please remove it.");
 	}
 	if (!scan_number_suffix(lexer, &is_float)) return false;
 	return new_token(lexer, is_float ? TOKEN_REAL : TOKEN_INTEGER, lexer->lexing_start);
@@ -753,7 +747,7 @@ static inline bool scan_char(Lexer *lexer)
 		signed char escape = ' ';
 		if (c == '\\')
 		{
-			assert(c == '\\');
+			ASSERT0(c == '\\');
 			c = peek(lexer);
 			escape = char_is_valid_escape(c);
 			if (escape == -1)
@@ -823,7 +817,7 @@ static inline bool scan_char(Lexer *lexer)
 		b = i128_shl64(b, 8);
 		b = i128_add64(b, (unsigned char)c);
 	}
-	assert(width > 0 && width <= 16);
+	ASSERT0(width > 0 && width <= 16);
 DONE:
 	set_generic_token(lexer, TOKEN_CHAR_LITERAL);
 	lexer->data.char_value = b;
@@ -1033,7 +1027,7 @@ static inline bool scan_raw_string(Lexer *lexer)
 static inline bool scan_hex_array(Lexer *lexer)
 {
 	char start_char = peek(lexer);
-	next(lexer); // Step past ' or "
+	next(lexer); // Step past ' or " `
 	char c;
 	uint64_t len = 0;
 	while (1)
@@ -1081,7 +1075,7 @@ static inline bool scan_base64(Lexer *lexer)
 	next(lexer); // Step past 6
 	next(lexer); // Step past 4
 	char start_char = peek(lexer);
-	next(lexer); // Step past ' or "
+	next(lexer); // Step past ' or " or `
 	char c;
 	unsigned end_len = 0;
 	uint64_t len = 0;
@@ -1159,21 +1153,6 @@ static inline bool scan_base64(Lexer *lexer)
 
 // --- Lexer doc lexing
 
-
-INLINE void skip_to_doc_line_end(Lexer *lexer)
-{
-	// Let's skip to either EOF, EOL or */
-	char c = peek(lexer);
-	while (1)
-	{
-		if (reached_end(lexer)) return;
-		if (c == '\n') return;
-		if (c == '*' && peek_next(lexer) == '/') return;
-		c = next(lexer);
-	}
-}
-
-
 /**
  * Parse the <* *> directives comments
  **/
@@ -1239,7 +1218,7 @@ static bool lexer_scan_token_inner(Lexer *lexer)
 	switch (c)
 	{
 		case '\n':
-			assert(lexer->mode == LEX_CONTRACTS);
+			ASSERT0(lexer->mode == LEX_CONTRACTS);
 			return new_token(lexer, TOKEN_DOCS_EOL, "<eol>");
 		case '@':
 			if (char_is_letter_(peek(lexer)))
@@ -1363,13 +1342,13 @@ static bool lexer_scan_token_inner(Lexer *lexer)
 			if (match(lexer, '=')) return new_token(lexer, TOKEN_MINUS_ASSIGN, "-=");
 			return new_token(lexer, TOKEN_MINUS, "-");
 		case 'x':
-			if ((peek(lexer) == '"' || peek(lexer) == '\''))
+			if ((peek(lexer) == '"' || peek(lexer) == '\'' || peek(lexer) == '`'))
 			{
 				return scan_hex_array(lexer);
 			}
 			goto IDENT;
 		case 'b':
-			if (peek(lexer) == '6' && peek_next(lexer) == '4' && (lexer->current[2] == '\'' || lexer->current[2] == '"'))
+			if (peek(lexer) == '6' && peek_next(lexer) == '4' && (lexer->current[2] == '\'' || lexer->current[2] == '"' || lexer->current[2] == '`'))
 			{
 				return scan_base64(lexer);
 			}
