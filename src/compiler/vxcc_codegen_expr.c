@@ -115,7 +115,7 @@ static vx_IrVar vxcc_emit_binary(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr,
         case BINARYOP_DIV_ASSIGN:
         case BINARYOP_DIV: ty = type_is_signed(expr->type) ? VX_IR_OP_SDIV : VX_IR_OP_UDIV; break;
         case BINARYOP_MOD_ASSIGN:
-        case BINARYOP_MOD: ty = VX_IR_OP_MOD; break;
+		case BINARYOP_MOD: ty = type_is_signed(expr->type) ? VX_IR_OP_SMOD : VX_IR_OP_UMOD; break;
         case BINARYOP_SHR_ASSIGN:
         case BINARYOP_SHR: ty = type_is_signed(expr->type) ? VX_IR_OP_ASHR : VX_IR_OP_SHR; break;
         case BINARYOP_SHL_ASSIGN:

@@ -104,11 +104,12 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             Ast* bthen = astptr(stmt->if_stmt.then_body);
             Ast* belse = astptrzero(stmt->if_stmt.else_body);
 
+            vx_OptIrVar condVar = vxcc_emit_expr(dest_block, cu, cond);
+            assert(condVar.present);
+
             vx_IrOp* if_op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(if_op, VX_IR_OP_IF, dest_block);
 
-            vx_OptIrVar condVar = vxcc_emit_expr(dest_block, cu, cond);
-            assert(condVar.present);
             vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND, VX_IR_VALUE_VAR(condVar.var));
 
             vx_IrBlock* vbthen = vx_IrBlock_initHeap(dest_block, if_op);
