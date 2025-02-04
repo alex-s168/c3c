@@ -18,7 +18,7 @@ typedef struct {
 } VxccCU;
 
 VxccVarDecl* vxcc_var(Decl* decl);
-vx_IrType* vxcc_type(Type* type);
+vx_IrType* vxcc_type(VxccCU* cu, Type* type);
 
 void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt);
 vx_OptIrVar vxcc_emit_expr(vx_IrBlock* dest_block, VxccCU* cu, Expr* expr);

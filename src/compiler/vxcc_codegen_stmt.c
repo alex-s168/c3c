@@ -7,7 +7,7 @@ static void vxcc_emit_decl_stmt(vx_IrBlock* dest_block, VxccCU* cu, Decl* decl)
         case DECL_VAR: {
             VarDecl* vd = &decl->var;
             VxccVarDecl* vxcc = vxcc_var(decl);
-            vx_IrType* vxty = vxcc_type(typeget(decl->var.type_info));
+            vx_IrType* vxty = vxcc_type(cu, typeget(decl->var.type_info));
 
             vx_IrValue initVal;
             if (vd->init_expr != NULL)
@@ -107,11 +107,9 @@ void vxcc_emit_stmt(vx_IrBlock* dest_block, VxccCU* cu, Ast* stmt)
             vx_IrOp* if_op = vx_IrBlock_addOpBuilding(dest_block);
             vx_IrOp_init(if_op, VX_IR_OP_IF, dest_block);
 
-            vx_IrBlock* vbcond = vx_IrBlock_initHeap(dest_block, if_op);
-            vx_OptIrVar condVar = vxcc_emit_expr(vbcond, cu, cond);
+            vx_OptIrVar condVar = vxcc_emit_expr(dest_block, cu, cond);
             assert(condVar.present);
-            vx_IrBlock_addOut(vbcond, condVar.var);
-            vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND, VX_IR_VALUE_BLK(vbcond));
+            vx_IrOp_addParam_s(if_op, VX_IR_NAME_COND, VX_IR_VALUE_VAR(condVar.var));
 
             vx_IrBlock* vbthen = vx_IrBlock_initHeap(dest_block, if_op);
             for (; bthen; bthen = astptrzero(bthen->next))

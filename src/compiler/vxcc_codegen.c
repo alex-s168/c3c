@@ -57,14 +57,14 @@ VxccVarDecl* vxcc_var(Decl* decl)
     return NULL;
 }
 
-vx_IrType* vxcc_type(Type* type)
+vx_IrType* vxcc_type(VxccCU* cu, Type* type)
 {
     assert(type != NULL);
 
     if (type->backend_type) return type->backend_type;
 
     if (type->type_kind == TYPE_TYPEDEF) {
-        vx_IrType* ty = vxcc_type(type->canonical);
+        vx_IrType* ty = vxcc_type(cu, type->canonical);
         type->backend_type = ty; 
         return ty;
     }
@@ -87,7 +87,6 @@ vx_IrType* vxcc_type(Type* type)
             res->base.size = 0;
             res->base.align = 0;
             res->base.isfloat = false;
-            res->base.sizeless = false;
             break;
         }
 
@@ -95,7 +94,6 @@ vx_IrType* vxcc_type(Type* type)
             res->kind = VX_IR_TYPE_KIND_BASE;
             res->base.size = 1;
             res->base.align = 1;
-            res->base.sizeless = false;
             res->base.isfloat = false;
             break;
         }
@@ -104,7 +102,6 @@ vx_IrType* vxcc_type(Type* type)
             res->kind = VX_IR_TYPE_KIND_BASE;
             res->base.size = compiler.platform.width_pointer / 8;
             res->base.align = compiler.platform.align_pointer.align;
-            res->base.sizeless = false;
             res->base.isfloat = false;
             break;
         }
@@ -124,7 +121,6 @@ vx_IrType* vxcc_type(Type* type)
             res->kind = VX_IR_TYPE_KIND_BASE;
             res->base.size = type->builtin.bytesize;
             res->base.align = type->builtin.abi_alignment;
-            res->base.sizeless = false;
             res->base.isfloat = false;
             break;
         }
@@ -136,7 +132,6 @@ vx_IrType* vxcc_type(Type* type)
             res->kind = VX_IR_TYPE_KIND_BASE;
             res->base.size = type->builtin.bytesize;
             res->base.align = type->builtin.abi_alignment;
-            res->base.sizeless = false;
             res->base.isfloat = true;
             break;
         }
@@ -147,6 +142,8 @@ vx_IrType* vxcc_type(Type* type)
             error_exit("VXCC currently doesn't support %s type (typekind %i)", type->name, type->type_kind);
         }
     }
+
+	vx_CU_addType(cu->cu, res);
 
     return res;
 }
@@ -180,7 +177,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
         vx_IrVar outVar = vx_IrBlock_newVar(block, initOp);
         assert(outVar == 0);
         vx_IrOp_init(initOp, VX_IR_OP_IMM, block);
-        vx_IrOp_addOut(initOp, outVar, vxcc_type(retTy));
+        vx_IrOp_addOut(initOp, outVar, vxcc_type(cu, retTy));
         vx_IrOp_addParam_s(initOp, VX_IR_NAME_VALUE, VX_IR_VALUE_UNINIT());
 
         vx_IrBlock_addOut(block,  outVar);
@@ -191,7 +188,7 @@ static vx_IrBlock* vxcc_emit_function_body(VxccCU* cu, Decl* decl)
     {
         VxccVarDecl* vxcc = vxcc_var(param);
         Type* ty = typeget(param->var.type_info);
-        vx_IrBlock_addIn(block, vxcc->vxVar, vxcc_type(ty));
+        vx_IrBlock_addIn(block, vxcc->vxVar, vxcc_type(cu, ty));
     }
 
     Ast* body = astptrzero(fn->body);
@@ -299,40 +296,8 @@ const char *vxcc_codegen(void *context)
 {
 	vx_CU* cu = context;
 
-    FILE* optionalOptimizedSsaIr = stdout; // TODO: remove
-    FILE* optionalOptimizedLlIr = stdout;  //       ^^^^
-    FILE* optionalAsm = stdout;
-    vx_BinFormat optionalBinFormat = 0; FILE* optionalBinOut = NULL;
+	struct SNode* nd = vx_CU_emitS(cu);
+	snode_print(nd, stdout);
 
-    int res = vx_CU_compile(cu,
-                optionalOptimizedSsaIr,
-                optionalOptimizedLlIr,
-                optionalAsm,
-                optionalBinFormat, optionalBinOut);
-
-    if (optionalOptimizedSsaIr && optionalOptimizedSsaIr != stdout)
-    {
-        fclose(optionalOptimizedSsaIr);
-    }
-
-    if (optionalOptimizedLlIr && optionalOptimizedLlIr != stdout)
-    {
-        fclose(optionalOptimizedLlIr);
-    }
-
-    if (optionalAsm && optionalAsm != stdout)
-    {
-        fclose(optionalAsm);
-    }
-
-    if (optionalBinOut && optionalBinOut != stdout)
-    {
-        fclose(optionalBinOut);
-    }
-
-    if (res)
-    {
-        return NULL;
-    }
     return "fake";
 }
